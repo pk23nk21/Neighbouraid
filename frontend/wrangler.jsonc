@@ -1,0 +1,35 @@
+{
+  // Cloudflare Workers config for the NeighbourAid SPA.
+  //
+  // We're using the new "Workers Static Assets" flow rather than classic
+  // Pages. Cloudflare is consolidating both products under Workers; the
+  // resulting deployment is functionally a Pages site with a different
+  // dashboard. No JS Worker code is needed — `assets` alone serves the
+  // bundle.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "neighbouraid",
+  // Lock the runtime API surface to a known-good date. Bump this only
+  // after testing against newer Worker runtime semantics.
+  "compatibility_date": "2024-12-01",
+
+  "assets": {
+    // Vite outputs to dist/ relative to this file (which lives in frontend/).
+    "directory": "./dist",
+
+    // SPA fallback: Cloudflare serves /index.html for any unmatched
+    // path so React Router can handle client-side routes
+    // (/alert/:id, /profile, etc.) without 404ing at the edge.
+    // This replaces the manual `_redirects` file approach used by
+    // classic Pages.
+    "not_found_handling": "single-page-application"
+  },
+
+  // Site URL: https://neighbouraid.<your-account>.workers.dev
+  // (or your custom domain if you wire one up later)
+
+  // We deliberately do NOT define a Worker entry point — assets-only
+  // deploys don't need one and adding one forces Workers-paid features.
+  "observability": {
+    "enabled": true
+  }
+}
