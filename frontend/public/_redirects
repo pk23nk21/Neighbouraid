@@ -1,6 +1,1 @@
-# Cloudflare Pages / Netlify SPA fallback.
-# Without this file, `/alert/:id` and other React-Router paths 404
-# because Cloudflare looks for a literal file at that path. The catch-
-# all rule below tells the edge to serve `index.html` for any unmatched
-# route so the SPA's router can take over on the client.
-/*    /index.html   200
+/* /index.html 200
