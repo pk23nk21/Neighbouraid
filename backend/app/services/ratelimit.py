@@ -46,5 +46,20 @@ class RateLimiter:
             self._buckets.clear()
 
 
-# 10 anonymous alerts per IP per hour. Tunable from a single place.
+# Tunable, project-wide limiters. Free tier sees no real abuse so these
+# are deliberately generous; tighten if you ever start seeing scrapes.
 anonymous_alert_limiter = RateLimiter(max_per_window=10, window_seconds=3600)
+
+# Login attempts per IP. 20/min is forgiving for a forgetful user but
+# stops a credential-stuffing bot from churning through a leaked
+# password list.
+login_limiter = RateLimiter(max_per_window=20, window_seconds=60)
+
+# Account creation per IP. 5/hour stops casual spammers without
+# blocking a household / classroom NAT.
+register_limiter = RateLimiter(max_per_window=5, window_seconds=3600)
+
+# Witness / flag / update — UGC writes. 60/min covers any legitimate
+# activity in a real crisis (one user can't physically tap that fast)
+# while still rate-limiting griefers.
+write_limiter = RateLimiter(max_per_window=60, window_seconds=60)

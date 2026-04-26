@@ -6,6 +6,7 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from ..core.limits import limit_write
 from ..core.security import get_current_user, require_role
 from ..db.client import get_db
 from ..models.alert import AlertCreate, ETAUpdate
@@ -595,7 +596,11 @@ async def list_updates(
     return out
 
 
-@router.post("/{alert_id}/updates", status_code=201)
+@router.post(
+    "/{alert_id}/updates",
+    status_code=201,
+    dependencies=[Depends(limit_write)],
+)
 async def add_update(
     alert_id: str,
     body: dict,
@@ -633,7 +638,11 @@ async def add_update(
     }
 
 
-@router.post("/{alert_id}/witness", status_code=200)
+@router.post(
+    "/{alert_id}/witness",
+    status_code=200,
+    dependencies=[Depends(limit_write)],
+)
 async def witness_alert(
     alert_id: str,
     payload: dict = Depends(get_current_user),
@@ -688,7 +697,11 @@ async def witness_alert(
     return serialized
 
 
-@router.post("/{alert_id}/flag", status_code=200)
+@router.post(
+    "/{alert_id}/flag",
+    status_code=200,
+    dependencies=[Depends(limit_write)],
+)
 async def flag_alert(
     alert_id: str,
     payload: dict = Depends(get_current_user),

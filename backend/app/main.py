@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .core.security import decode_token_safe
+from .core.security_headers import SecurityHeadersMiddleware
 from .db.client import connect, disconnect
 from .routes import alerts, auth, inbound, news, resources, safety, stats, users
 from .services.websocket import manager
@@ -26,17 +27,33 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="NeighbourAid API", version="1.0.0", lifespan=lifespan)
 
+# Security headers run BEFORE CORS so they apply even to CORS-rejected
+# preflight responses. (Starlette evaluates middleware in reverse-add
+# order — last-added is outermost.)
+app.add_middleware(SecurityHeadersMiddleware)
+
 # Allow the configured frontend origins. Extra hosts can be appended via
-# FRONTEND_ORIGINS (comma-separated) so production deploys don't need code edits.
+# FRONTEND_ORIGINS (comma-separated). The regex allow-list covers the two
+# free hosts users actually deploy to (Vercel + HuggingFace Spaces). Auth
+# is JWT-in-Authorization-header — not cookies — so credentials=true is
+# safe and the Authorization header is not exempt from same-origin policy.
 _default_origins = ["http://localhost:3000", "http://localhost:5173"]
 _extra = [o.strip() for o in os.getenv("FRONTEND_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_default_origins + _extra,
-    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com",
+    allow_origin_regex=(
+        r"https://.*\.vercel\.app|"
+        r"https://.*\.onrender\.com|"
+        r"https://.*\.hf\.space|"
+        r"https://.*\.netlify\.app|"
+        r"https://.*\.pages\.dev"
+    ),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Inbound-Token"],
+    expose_headers=[],
+    max_age=600,
 )
 
 app.include_router(auth.router)

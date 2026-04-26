@@ -14,6 +14,23 @@ export default defineConfig({
       },
     },
   },
+  // Split the bundle by responsibility so the user only downloads the
+  // map-related code on first visit to /map, not on /login. Cuts the
+  // initial JS payload roughly in half on the auth pages.
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'leaflet-vendor': ['leaflet', 'react-leaflet'],
+          'auth-vendor': ['axios', 'jwt-decode'],
+        },
+      },
+    },
+    // Lift the warning ceiling to a sane level after splitting; below
+    // this size each chunk loads in ~1 RTT on a 3G connection.
+    chunkSizeWarningLimit: 600,
+  },
   test: {
     environment: 'jsdom',
     globals: true,

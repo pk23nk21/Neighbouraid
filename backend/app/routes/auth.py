@@ -1,13 +1,14 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from ..db.client import get_db
 from ..models.user import UserCreate, UserLogin
 from ..core.security import hash_password, verify_password, create_token
+from ..core.limits import limit_login, limit_register
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-@router.post("/register", status_code=201)
+@router.post("/register", status_code=201, dependencies=[Depends(limit_register)])
 async def register(user: UserCreate):
     db = get_db()
     if await db.users.find_one({"email": user.email}):
@@ -28,7 +29,7 @@ async def register(user: UserCreate):
     return {"token": token, "role": user.role.value, "name": user.name}
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(limit_login)])
 async def login(creds: UserLogin):
     db = get_db()
     user = await db.users.find_one({"email": creds.email})

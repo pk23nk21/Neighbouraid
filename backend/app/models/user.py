@@ -60,7 +60,12 @@ class EmergencyContact(BaseModel):
 class UserCreate(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
+    # Strengthened from 6 chars to 8 with at-least-one-letter,
+    # at-least-one-digit. Doesn't force special chars (which the OWASP
+    # 2024 guidance now considers an anti-pattern that drives users
+    # toward `Password!1` clones), but blocks the lowest-effort
+    # passwords like "123456" or "password".
+    password: str = Field(min_length=8, max_length=128)
     role: UserRole
     location: GeoPoint
     # Volunteer-only optional fields. Ignored for reporters.
@@ -75,6 +80,17 @@ class UserCreate(BaseModel):
         if len(stripped) < 2:
             raise ValueError("name must be at least 2 non-space characters")
         return stripped
+
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        # Require at least one letter and one digit. Avoids the worst
+        # passwords without the security-theatre of mandatory specials.
+        if not any(ch.isalpha() for ch in v) or not any(ch.isdigit() for ch in v):
+            raise ValueError(
+                "password must contain at least one letter and one digit"
+            )
+        return v
 
 
 class UserLogin(BaseModel):
