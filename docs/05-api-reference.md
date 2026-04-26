@@ -47,7 +47,7 @@ Public. Create a user.
 ```jsonc
 // body
 {
-  "name": "Parth Kansal",
+  "name": "Asha Patel",
   "email": "parth@example.com",
   "password": "min-6-chars",
   "role": "reporter" | "volunteer",
@@ -59,7 +59,7 @@ Public. Create a user.
   ]
 }
 // 201
-{ "token": "eyJhbGc...", "role": "reporter", "name": "Parth Kansal" }
+{ "token": "eyJhbGc...", "role": "reporter", "name": "Asha Patel" }
 ```
 
 ### `POST /api/auth/login`
@@ -69,7 +69,7 @@ Public. Exchange creds for JWT. 401 on bad creds.
 // body
 { "email": "parth@example.com", "password": "..." }
 // 200
-{ "token": "eyJhbGc...", "role": "reporter", "name": "Parth Kansal" }
+{ "token": "eyJhbGc...", "role": "reporter", "name": "Asha Patel" }
 ```
 
 ---

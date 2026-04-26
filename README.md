@@ -1,12 +1,13 @@
 # NeighbourAid — Hyperlocal Crisis & Help Network
 
 [![CI](https://github.com/parthkansal823/FSD-2/actions/workflows/ci.yml/badge.svg)](https://github.com/parthkansal823/FSD-2/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-143%20passing-brightgreen)](docs/08-testing.md)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
-[![Backend](https://img.shields.io/badge/backend-FastAPI%20·%20Python%203.11+-009688?logo=fastapi&logoColor=white)](backend/)
-[![Frontend](https://img.shields.io/badge/frontend-React%2018%20·%20Vite-61dafb?logo=react&logoColor=white)](frontend/)
-[![DB](https://img.shields.io/badge/db-MongoDB%206-47A248?logo=mongodb&logoColor=white)](docker-compose.yml)
-[![PWA](https://img.shields.io/badge/PWA-installable-5A0FC8)](frontend/public/manifest.webmanifest)
+[![Tests](https://img.shields.io/badge/tests-143_passing-brightgreen)](docs/08-testing.md)
+[![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](backend/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)](backend/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)](frontend/)
+[![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](frontend/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-6-47A248?logo=mongodb&logoColor=white)](docker-compose.yml)
+[![PWA](https://img.shields.io/badge/PWA-installable-5A0FC8?logo=pwa&logoColor=white)](frontend/public/manifest.webmanifest)
 
 > Real-time, multi-source-verified community crisis response for India.
 > Reporters post (text, GPS, optional photos, voice). AI triages
@@ -30,7 +31,6 @@
 - [Deployment](#deployment)
 - [Environment variables](#environment-variables)
 - [Roadmap](#roadmap)
-- [License](#license)
 
 ---
 

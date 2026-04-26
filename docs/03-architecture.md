@@ -119,7 +119,7 @@ neighbouraid/
 ```jsonc
 {
   "_id": ObjectId,
-  "name": "Parth Kansal",
+  "name": "Asha Patel",
   "email": "parth@example.com",
   "password_hash": "$2b$12$...",   // bcrypt
   "role": "reporter" | "volunteer",
