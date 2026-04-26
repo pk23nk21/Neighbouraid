@@ -5,21 +5,25 @@ internet using **only services that don't require a credit card**:
 
 | Layer | Service | Free tier |
 |---|---|---|
-| Frontend | **Vercel** | Free, no card, GitHub login |
+| Frontend | **Cloudflare Pages** | Free, no card, 5+ India PoPs (Mumbai/Delhi/Bangalore/Hyderabad/Chennai) |
 | Backend | **HuggingFace Spaces** (Docker SDK) | 2 vCPU + 16 GB RAM, no card, never sleeps |
 | Database | **MongoDB Atlas M0** | 512 MB, no card, Mumbai region |
 
 **Total time:** ~25 minutes start to finish.
 
-You'll need three accounts (all free, all signup-with-email or
+You'll need four accounts (all free, all signup-with-email or
 GitHub-OAuth):
 1. [GitHub](https://github.com) — to push code
-2. [HuggingFace](https://huggingface.co/join) — for the backend
-3. [Vercel](https://vercel.com/signup) — for the frontend
+2. [Cloudflare](https://dash.cloudflare.com/sign-up) — for the frontend
+3. [HuggingFace](https://huggingface.co/join) — for the backend
 4. [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register) — for the database
 
 Push your code to `https://github.com/pk23nk21/NeighbourAid` first —
-both Vercel and HuggingFace pull source from GitHub.
+both Cloudflare Pages and HuggingFace pull source from GitHub.
+
+> **Why Cloudflare Pages?** It has the deepest CDN coverage in India
+> (5+ city PoPs vs Vercel's 1 vs Netlify's 0). For a crisis-response
+> app where a few hundred milliseconds matter, this is the right pick.
 
 ---
 
@@ -151,30 +155,47 @@ The Swagger UI is at `https://<you>-neighbouraid-api.hf.space/docs`.
 
 ---
 
-## Step 3 — Frontend on Vercel (5 min)
+## Step 3 — Frontend on Cloudflare Pages (5 min)
 
 1. Push your code to GitHub if you haven't:
    ```bash
    git push origin main
    ```
-2. Go to <https://vercel.com/new>.
-3. Click **Import Git Repository** → pick `pk23nk21/NeighbourAid`.
-4. Configure the project:
-   - **Framework Preset**: *Vite*
-   - **Root Directory**: `frontend` ← important
-   - **Build Command**: `npm run build` (auto-filled)
-   - **Output Directory**: `dist` (auto-filled)
-5. **Environment Variables** (click *Environment Variables* before
-   *Deploy*):
+2. Sign in at <https://dash.cloudflare.com>.
+3. In the left sidebar: **Workers & Pages** → **Create** →
+   **Pages** tab → **Connect to Git**.
+4. Authorise GitHub when prompted, pick `pk23nk21/NeighbourAid`,
+   click **Begin setup**.
+5. **Build configuration**:
+
+   | Field | Value |
+   |---|---|
+   | Project name | `neighbouraid` (or whatever — becomes part of the URL) |
+   | Production branch | `main` |
+   | Framework preset | **Vite** |
+   | Build command | `npm run build` |
+   | Build output directory | `dist` |
+   | **Root directory (advanced)** | **`frontend`** ← important |
+
+6. **Environment variables** — click *Add variable* for each:
 
    | Name | Value |
    |---|---|
    | `VITE_API_URL` | `https://<you>-neighbouraid-api.hf.space` |
    | `VITE_WS_URL` | `wss://<you>-neighbouraid-api.hf.space` |
 
-6. Click **Deploy**. Vercel builds in ~60 seconds.
-7. Note your live URL — `https://neighbour-aid-xxxxx.vercel.app` or
-   the custom domain you set.
+7. Set both to **Production** environment. Click **Save and Deploy**.
+8. Cloudflare builds in ~60–90 seconds. Your live URL is
+   `https://neighbouraid.pages.dev` (or
+   `https://neighbouraid-xxxxx.pages.dev` if the name was taken).
+
+> **What about SPA routing?** The repo ships
+> `frontend/public/_redirects` and `frontend/public/_headers` —
+> Cloudflare Pages reads both at deploy time. The `_redirects` file
+> rewrites all unmatched paths to `/index.html` so React Router can
+> handle `/alert/:id` etc. The `_headers` file applies the same
+> security-header set the backend does, plus aggressive caching for
+> hashed assets and a no-cache rule for `/service-worker.js`.
 
 ---
 
@@ -184,10 +205,10 @@ Back to your HuggingFace Space → Settings → Variables → edit
 `FRONTEND_ORIGINS`:
 
 ```
-https://neighbour-aid-xxxxx.vercel.app
+https://neighbouraid.pages.dev
 ```
 
-(Comma-separate if you have multiple — preview branches, custom
+(Comma-separate if you have multiple — preview branches, a custom
 domain, etc.)
 
 The Space redeploys automatically. Without this, the browser will
@@ -197,8 +218,8 @@ block your alert POSTs with a CORS error.
 
 ## Step 5 — Smoke test (3 min)
 
-Open your Vercel URL in two different browsers (or one normal + one
-incognito):
+Open your Cloudflare Pages URL in two different browsers (or one
+normal + one incognito):
 
 1. **Reporter**: register as a reporter, post a test alert with GPS
    somewhere in your city.
@@ -212,14 +233,17 @@ incognito):
 
 If WebSocket doesn't connect, open DevTools → Network → WS tab. The
 URL should be `wss://<you>-neighbouraid-api.hf.space/ws/volunteer?
-token=…` — if it's `ws://` instead, your Vercel env vars need the
-`wss://` (TLS) variant.
+token=…` — if it's `ws://` instead, your Cloudflare Pages env vars
+need the `wss://` (TLS) variant. After fixing them, retrigger a
+deploy from the Cloudflare dashboard (env-var changes don't
+auto-rebuild).
 
 ---
 
 ## Updating
 
-- **Frontend changes**: `git push` → Vercel auto-deploys in ~60 s.
+- **Frontend changes**: `git push` → Cloudflare Pages auto-deploys in
+  ~60–90 s. Each PR also gets a preview URL.
 - **Backend changes**: push to your `huggingface.co/spaces/.../...`
   remote → the Space rebuilds automatically.
 

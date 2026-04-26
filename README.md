@@ -392,7 +392,7 @@ build cache.
 
 ## Deployment
 
-### Recommended — Vercel + HuggingFace Spaces + MongoDB Atlas (no credit card)
+### Recommended — Cloudflare Pages + HuggingFace Spaces + MongoDB Atlas (no credit card)
 
 The whole stack runs on free tiers that don't ask for a card. See
 [docs/07-deployment.md](docs/07-deployment.md) for the full
@@ -406,9 +406,13 @@ click-by-click guide. Summary:
   in the Space secrets. The Dockerfile honours `$PORT` so it works
   on HF Spaces (7860), Render (10000), Railway, or local (8000)
   without changes.
-- **Vercel** → frontend root `frontend/`, env vars
+- **Cloudflare Pages** → connect the GitHub repo, set Root directory
+  to `frontend/`, add env vars
   `VITE_API_URL=https://<owner>-<space>.hf.space` and
-  `VITE_WS_URL=wss://<owner>-<space>.hf.space`.
+  `VITE_WS_URL=wss://<owner>-<space>.hf.space`. The repo ships
+  `_redirects` + `_headers` in `frontend/public/` so SPA routing and
+  edge security headers Just Work. Cloudflare's Indian PoPs (5+
+  cities) give you the lowest latency for your users.
 
 ### One-command Ubuntu
 
