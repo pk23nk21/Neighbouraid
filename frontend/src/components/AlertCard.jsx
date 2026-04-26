@@ -1,0 +1,711 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import api from '../utils/api'
+import { apiError } from '../utils/error'
+import { useAuth } from '../context/AuthContext'
+import { useI18n } from '../utils/i18n'
+import { translateText } from '../utils/translate'
+import { useToast } from './Toast'
+import ShareAlert from './ShareAlert'
+import AutoDispatch from './AutoDispatch'
+
+const URGENCY_STYLES = {
+  CRITICAL: 'border-red-500 bg-red-950/40',
+  HIGH: 'border-orange-500 bg-orange-950/40',
+  MEDIUM: 'border-yellow-500 bg-yellow-950/40',
+  LOW: 'border-green-500 bg-green-950/40',
+}
+
+const URGENCY_BADGE = {
+  CRITICAL: 'bg-red-600 text-white',
+  HIGH: 'bg-orange-500 text-white',
+  MEDIUM: 'bg-yellow-500 text-black',
+  LOW: 'bg-green-600 text-white',
+}
+
+const CATEGORY_ICON = {
+  medical: '🏥',
+  flood: '🌊',
+  fire: '🔥',
+  missing: '🔍',
+  power: '⚡',
+  other: '⚠️',
+}
+
+function useTimeAgo(iso) {
+  const { t } = useI18n()
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 30000)
+    return () => clearInterval(id)
+  }, [])
+  if (!iso) return ''
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (Number.isNaN(diff)) return ''
+  if (diff < 0) return `0${t('t_sec')}`
+  if (diff < 60) return `${diff}${t('t_sec')}`
+  if (diff < 3600) return `${Math.floor(diff / 60)}${t('t_min')}`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}${t('t_hr')}`
+  return `${Math.floor(diff / 86400)}${t('t_day')}`
+}
+
+function scoreBand(score, t) {
+  if (score >= 70) return { label: t('card_high_conf'), color: 'text-emerald-400', bar: 'bg-emerald-500' }
+  if (score >= 40) return { label: t('card_corroborated'), color: 'text-amber-400', bar: 'bg-amber-500' }
+  return { label: t('card_unverified'), color: 'text-gray-400', bar: 'bg-gray-500' }
+}
+
+// Very light script-based language detection — good enough to decide
+// "does this text need translation for the current user?" without shipping
+// an NLP model.
+function detectScript(text) {
+  if (!text) return 'en'
+  if (/[ऀ-ॿ]/.test(text)) return 'hi' // Devanagari
+  if (/[਀-੿]/.test(text)) return 'pa' // Gurmukhi
+  return 'en'
+}
+
+function TranslatableText({ text, sourceLang }) {
+  const { lang, autoTranslate } = useI18n()
+  const [translated, setTranslated] = useState(null)
+  const [showing, setShowing] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const detected = useMemo(() => sourceLang || detectScript(text), [text, sourceLang])
+  const needsTranslation = detected !== lang && !!text?.trim()
+
+  // Auto-translate on mount when the detected source differs from the
+  // user's chosen language. Respects the autoTranslate pref so users on
+  // limited data can leave it off.
+  useEffect(() => {
+    let cancelled = false
+    if (!autoTranslate || !needsTranslation) return undefined
+    setLoading(true)
+    translateText(text, lang)
+      .then((out) => {
+        if (cancelled) return
+        if (out && out !== text) {
+          setTranslated(out)
+          setShowing(true)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [text, lang, autoTranslate, needsTranslation])
+
+  const toggle = async () => {
+    if (showing) {
+      setShowing(false)
+      return
+    }
+    if (translated == null) {
+      setLoading(true)
+      try {
+        const out = await translateText(text, lang)
+        setTranslated(out)
+      } finally {
+        setLoading(false)
+      }
+    }
+    setShowing(true)
+  }
+
+  const display = showing && translated != null ? translated : text
+  const canTranslate = !!text && text.trim().length > 0
+
+  return (
+    <div>
+      <p className="text-gray-200 text-sm whitespace-pre-wrap break-words">{display}</p>
+      {canTranslate && (
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={loading}
+          className="text-[11px] text-blue-300 hover:text-blue-200 mt-1 disabled:opacity-50"
+          title={showing ? 'Show original' : `Translate to ${lang.toUpperCase()}`}
+        >
+          {loading
+            ? '🌐 translating…'
+            : showing
+            ? `🌐 Show original (${detected.toUpperCase()})`
+            : `🌐 Translate to ${lang.toUpperCase()}`}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function PhotoGallery({ alertId, photoCount, inlinePhotos }) {
+  const [photos, setPhotos] = useState(inlinePhotos || [])
+  const [loadedFor, setLoadedFor] = useState(inlinePhotos?.length ? alertId : null)
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(null)
+  const [error, setError] = useState('')
+
+  // Lazy-load photos the first time the user shows interest. Alert lists
+  // never ship photo base64 (would balloon payloads), so we fetch on demand.
+  const fetchIfNeeded = useCallback(async () => {
+    if (loadedFor === alertId) return
+    setLoading(true)
+    setError('')
+    try {
+      const { data } = await api.get(`/api/alerts/${alertId}/photos`)
+      setPhotos(data?.photos || [])
+      setLoadedFor(alertId)
+    } catch (err) {
+      setError(apiError(err, 'Could not load photos'))
+    } finally {
+      setLoading(false)
+    }
+  }, [alertId, loadedFor])
+
+  if (!photoCount) return null
+
+  if (loadedFor !== alertId) {
+    return (
+      <button
+        type="button"
+        onClick={fetchIfNeeded}
+        disabled={loading}
+        className="mb-3 w-full text-xs bg-gray-900/60 hover:bg-gray-900 border border-gray-700 text-gray-300 rounded-lg py-2 transition-colors disabled:opacity-60"
+      >
+        {loading ? 'Loading photos…' : `📸 View ${photoCount} photo${photoCount !== 1 ? 's' : ''}`}
+      </button>
+    )
+  }
+
+  if (error) {
+    return <p className="text-xs text-red-400 mb-3">{error}</p>
+  }
+
+  if (photos.length === 0) return null
+
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        {photos.slice(0, 3).map((src, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => setOpen(i)}
+            className="aspect-square rounded-lg overflow-hidden border border-gray-700 bg-gray-800 group relative"
+            aria-label={`Open photo ${i + 1}`}
+          >
+            <img
+              src={src}
+              alt={`evidence ${i + 1}`}
+              loading="lazy"
+              className="w-full h-full object-cover group-hover:opacity-80 transition-opacity"
+            />
+          </button>
+        ))}
+      </div>
+      {open != null && (
+        <div
+          className="fixed inset-0 z-[1050] bg-black/85 flex items-center justify-center p-4"
+          onClick={() => setOpen(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <img
+            src={photos[open]}
+            alt={`evidence ${open + 1}`}
+            className="max-w-full max-h-full rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setOpen(null)}
+            className="absolute top-4 right-4 bg-black/70 hover:bg-black text-white w-10 h-10 rounded-full text-xl leading-none flex items-center justify-center"
+            aria-label="Close"
+          >
+            ×
+          </button>
+          {photos.length > 1 && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpen((i) => (i - 1 + photos.length) % photos.length)
+                }}
+                className="absolute left-4 bg-black/70 hover:bg-black text-white w-10 h-10 rounded-full"
+                aria-label="Previous"
+              >
+                ‹
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpen((i) => (i + 1) % photos.length)
+                }}
+                className="absolute right-4 bg-black/70 hover:bg-black text-white w-10 h-10 rounded-full"
+                aria-label="Next"
+              >
+                ›
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
+function EtaStrip({ alert, onUpdate, canEdit }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(String(alert.eta_minutes ?? ''))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async () => {
+    const n = parseInt(value, 10)
+    if (Number.isNaN(n) || n < 0 || n > 240) {
+      setError('Enter 0–240 minutes')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const { data } = await api.patch(`/api/alerts/${alert.id}/eta`, {
+        eta_minutes: n,
+      })
+      onUpdate?.(data)
+      setEditing(false)
+    } catch (err) {
+      setError(apiError(err, 'Could not set ETA'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (alert.eta_minutes == null && !canEdit) return null
+
+  return (
+    <div className="mt-2 mb-3 bg-blue-950/40 border border-blue-800 rounded-lg px-3 py-2 text-xs text-blue-200 flex items-center gap-2 flex-wrap">
+      <span aria-hidden>🚗</span>
+      {editing ? (
+        <>
+          <input
+            type="number"
+            min={0}
+            max={240}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="bg-gray-900 border border-blue-700 text-blue-100 w-20 px-2 py-1 rounded-md text-xs"
+          />
+          <span>minutes</span>
+          <button
+            onClick={submit}
+            disabled={saving}
+            className="bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded-md text-xs disabled:opacity-60"
+          >
+            {saving ? '…' : 'Save'}
+          </button>
+          <button
+            onClick={() => {
+              setEditing(false)
+              setError('')
+            }}
+            className="text-blue-300 hover:text-white px-2 py-1 text-xs"
+          >
+            Cancel
+          </button>
+          {error && <span className="text-red-300 text-[11px] w-full">{error}</span>}
+        </>
+      ) : (
+        <>
+          {alert.eta_minutes != null ? (
+            <span>
+              ETA: <strong className="text-blue-100">{alert.eta_minutes} min</strong>
+            </span>
+          ) : (
+            <span className="text-blue-300">No ETA posted yet</span>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => {
+                setValue(String(alert.eta_minutes ?? ''))
+                setEditing(true)
+              }}
+              className="ml-auto text-xs underline hover:text-white"
+            >
+              {alert.eta_minutes != null ? 'Update' : 'Set ETA'}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+export default function AlertCard({ alert, onUpdate }) {
+  const { user } = useAuth()
+  const { t } = useI18n()
+  const { push: toast } = useToast()
+  const [loading, setLoading] = useState(null)
+  const [error, setError] = useState('')
+  const [showUpdates, setShowUpdates] = useState(false)
+  const [updates, setUpdates] = useState([])
+  const [newUpdate, setNewUpdate] = useState('')
+  const [loadingUpdates, setLoadingUpdates] = useState(false)
+  const [flagged, setFlagged] = useState(false)
+
+  const createdAgo = useTimeAgo(alert.created_at)
+
+  const fetchUpdates = useCallback(async () => {
+    setLoadingUpdates(true)
+    try {
+      const { data } = await api.get(`/api/alerts/${alert.id}/updates`)
+      setUpdates(data)
+    } catch {
+      /* silent */
+    } finally {
+      setLoadingUpdates(false)
+    }
+  }, [alert.id])
+
+  useEffect(() => {
+    if (showUpdates) fetchUpdates()
+  }, [showUpdates, fetchUpdates])
+
+  const postUpdate = async () => {
+    const body = newUpdate.trim()
+    if (body.length < 3) {
+      setError(t('card_update_too_short'))
+      return
+    }
+    setLoading('post')
+    setError('')
+    try {
+      const { data } = await api.post(`/api/alerts/${alert.id}/updates`, { body })
+      setUpdates((prev) => [...prev, data])
+      setNewUpdate('')
+    } catch (err) {
+      setError(apiError(err, t('card_update_failed')))
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const run = async (key, fn) => {
+    setLoading(key)
+    setError('')
+    try {
+      const { data } = await fn()
+      onUpdate?.(data)
+    } catch (err) {
+      setError(apiError(err, `Failed to ${key}`))
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const accept = () => run('accept', () => api.patch(`/api/alerts/${alert.id}/accept`))
+  const resolve = () => run('resolve', () => api.patch(`/api/alerts/${alert.id}/resolve`))
+  const witness = () => run('witness', () => api.post(`/api/alerts/${alert.id}/witness`))
+
+  const flag = async () => {
+    if (flagged) return
+    if (!window.confirm('Flag this alert as fake or spam?')) return
+    setLoading('flag')
+    try {
+      const { data } = await api.post(`/api/alerts/${alert.id}/flag`)
+      setFlagged(true)
+      toast({
+        variant: 'info',
+        title: 'Flagged',
+        body: `Thanks — current flag count: ${data.flags}`,
+      })
+    } catch (err) {
+      setError(apiError(err, 'Failed to flag alert'))
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const score = alert.verified_score ?? 0
+  const band = scoreBand(score, t)
+  const witnesses = alert.witnesses ?? 1
+  const isOwn = user?.id && alert.reporter_id === user.id
+  const [lng, lat] = alert.location?.coordinates ?? [0, 0]
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`
+
+  const canSetEta =
+    user?.role === 'volunteer' &&
+    alert.status === 'accepted' &&
+    alert.accepted_by === user.id
+
+  const isSkillMatch = alert.is_skill_match === true
+  const photoCount = alert.photo_count ?? (alert.photos?.length ?? 0)
+
+  return (
+    <div
+      className={`border rounded-xl p-3 sm:p-4 ${URGENCY_STYLES[alert.urgency]} transition-all hover:shadow-lg hover:shadow-black/40 fade-in ${
+        isSkillMatch ? 'ring-1 ring-amber-400/40' : ''
+      }`}
+    >
+      {isSkillMatch && (
+        <div className="mb-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest bg-amber-500/20 text-amber-300 border border-amber-700 px-2 py-0.5 rounded-full">
+          ✨ Matches your skills
+        </div>
+      )}
+      {alert.is_anonymous && (
+        <div className="mb-2 ml-1 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest bg-gray-800 text-gray-300 border border-gray-700 px-2 py-0.5 rounded-full">
+          🕶 Anonymous tip
+        </div>
+      )}
+      <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xl shrink-0">{CATEGORY_ICON[alert.category] ?? '⚠️'}</span>
+          <span className="font-semibold capitalize text-white truncate">
+            {t(`cat_${alert.category}`) ?? alert.category}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${URGENCY_BADGE[alert.urgency]}`}>
+            {alert.urgency}
+          </span>
+          {typeof alert.your_distance_km === 'number' && (
+            <span className="text-[11px] text-gray-400 bg-gray-900/60 border border-gray-800 px-2 py-0.5 rounded-full">
+              {alert.your_distance_km.toFixed(1)} km
+            </span>
+          )}
+          <span className="text-xs text-gray-400 whitespace-nowrap">{createdAgo}</span>
+        </div>
+      </div>
+
+      <div className="mb-3">
+        <TranslatableText text={alert.description} sourceLang={alert.language} />
+      </div>
+
+      {(alert.urgency === 'CRITICAL' || alert.urgency === 'HIGH') && (
+        <AutoDispatch category={alert.category} />
+      )}
+
+      <PhotoGallery
+        alertId={alert.id}
+        photoCount={photoCount}
+        inlinePhotos={alert.photos}
+      />
+
+      {alert.address && (
+        <p className="text-gray-500 text-xs mb-3 flex items-start gap-1">
+          <span aria-hidden className="shrink-0">📍</span>
+          <span className="line-clamp-2">{alert.address}</span>
+        </p>
+      )}
+
+      <EtaStrip alert={alert} onUpdate={onUpdate} canEdit={canSetEta} />
+
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] mb-3">
+        {typeof alert.urgency_confidence === 'number' && (
+          <span
+            className="bg-gray-900/60 border border-gray-800 text-gray-300 px-2 py-0.5 rounded-full"
+            title="AI confidence in the urgency classification"
+          >
+            🤖 {Math.round((alert.urgency_confidence ?? 0) * 100)}% {t('card_ai_confident')}
+          </span>
+        )}
+        {alert.photo_evidence_score > 0 && (
+          <span
+            className="bg-emerald-900/50 border border-emerald-700 text-emerald-200 px-2 py-0.5 rounded-full"
+            title={alert.photo_findings || 'Photo evidence boosts verification'}
+          >
+            📸 +{alert.photo_evidence_score} photo evidence
+          </span>
+        )}
+        {alert.vulnerability && (
+          <span
+            className="bg-pink-900/50 border border-pink-700 text-pink-200 px-2 py-0.5 rounded-full capitalize"
+          >
+            🧬 {alert.vulnerability}
+          </span>
+        )}
+        {alert.time_sensitivity && (
+          <span
+            className={`border px-2 py-0.5 rounded-full capitalize ${
+              alert.time_sensitivity === 'immediate'
+                ? 'bg-red-900/50 border-red-700 text-red-200'
+                : 'bg-gray-900/60 border-gray-800 text-gray-300'
+            }`}
+          >
+            ⏱ {alert.time_sensitivity}
+          </span>
+        )}
+        {alert.language && alert.language !== 'en' && (
+          <span
+            className="bg-blue-900/40 border border-blue-800 text-blue-200 px-2 py-0.5 rounded-full uppercase"
+          >
+            {alert.language}
+          </span>
+        )}
+        {alert.triggers?.length ? (
+          <span
+            className="bg-gray-900/60 border border-gray-800 text-gray-400 px-2 py-0.5 rounded-full"
+          >
+            🏷 {alert.triggers.join(', ')}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 mb-3">
+        <div className="flex items-center justify-between text-xs mb-1.5">
+          <span className={`font-semibold ${band.color}`}>{band.label}</span>
+          <span className="text-gray-500">{score}/100</span>
+        </div>
+        <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+          <div
+            className={`h-full ${band.bar} transition-all`}
+            style={{ width: `${score}%` }}
+          />
+        </div>
+        <div className="flex flex-wrap gap-3 mt-2 text-[11px] text-gray-400">
+          <span>👥 {witnesses} {witnesses !== 1 ? t('card_witness_many') : t('card_witness_one')}</span>
+          {alert.corroborating_ids?.length ? (
+            <span>🔗 {alert.corroborating_ids.length} {t('card_similar_nearby')}</span>
+          ) : null}
+          {alert.weather_match ? <span title="Live weather consistent">🌦 {t('card_weather_match')}</span> : null}
+          {alert.flags > 0 && (
+            <span className="text-red-300" title="Flagged by community">
+              🚩 {alert.flags}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span
+          className={`text-xs px-2 py-0.5 rounded-full ${
+            alert.status === 'open'
+              ? 'bg-blue-900 text-blue-300'
+              : alert.status === 'accepted'
+              ? 'bg-purple-900 text-purple-300'
+              : 'bg-gray-800 text-gray-400'
+          }`}
+        >
+          {alert.status}
+        </span>
+
+        <div className="flex gap-1.5 sm:gap-2 flex-wrap justify-end">
+          {user && (
+            <button
+              onClick={() => setShowUpdates((v) => !v)}
+              className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded-lg transition-colors"
+              title="Show situational updates timeline"
+            >
+              {t('card_updates')}{updates.length ? ` (${updates.length})` : ''}
+            </button>
+          )}
+          <ShareAlert alert={alert} />
+          <a
+            href={mapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded-lg transition-colors"
+            title="Open directions in Google Maps"
+          >
+            {t('card_directions')}
+          </a>
+          {user && !isOwn && !flagged && (
+            <button
+              onClick={flag}
+              disabled={loading === 'flag'}
+              className="text-xs text-gray-500 hover:text-red-400 px-2 py-1 rounded-lg transition-colors"
+              title="Flag as fake or spam"
+            >
+              🚩 Flag
+            </button>
+          )}
+          {user && !isOwn && alert.status !== 'resolved' && (
+            <button
+              onClick={witness}
+              disabled={loading === 'witness'}
+              className="text-xs bg-amber-600/80 hover:bg-amber-600 disabled:opacity-50 text-white px-3 py-1 rounded-lg transition-colors"
+              title={t('card_see_too_tip')}
+            >
+              {loading === 'witness' ? '…' : t('card_see_too')}
+            </button>
+          )}
+          {user?.role === 'volunteer' && alert.status === 'open' && (
+            <button
+              onClick={accept}
+              disabled={loading === 'accept'}
+              className="text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-1 rounded-lg transition-colors"
+            >
+              {t('card_accept')}
+            </button>
+          )}
+          {user?.role === 'volunteer' && alert.status === 'accepted' && (
+            <button
+              onClick={resolve}
+              disabled={loading === 'resolve'}
+              className="text-xs bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-3 py-1 rounded-lg transition-colors"
+            >
+              {t('card_resolve')}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {showUpdates && (
+        <div className="mt-3 border-t border-gray-800 pt-3 space-y-2">
+          {loadingUpdates ? (
+            <p className="text-xs text-gray-500">{t('card_loading_updates')}</p>
+          ) : updates.length === 0 ? (
+            <p className="text-xs text-gray-500">{t('card_no_updates')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {updates.map((u) => (
+                <UpdateRow key={u.id} update={u} />
+              ))}
+            </ul>
+          )}
+          {user && alert.status !== 'resolved' && (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newUpdate}
+                onChange={(e) => setNewUpdate(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && postUpdate()}
+                placeholder={t('card_update_ph')}
+                maxLength={500}
+                className="flex-1 min-w-0 bg-gray-950 border border-gray-800 text-xs text-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-orange-500"
+              />
+              <button
+                onClick={postUpdate}
+                disabled={loading === 'post'}
+                className="text-xs bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+              >
+                {loading === 'post' ? '…' : t('card_send')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+    </div>
+  )
+}
+
+function UpdateRow({ update }) {
+  const updateAgo = useTimeAgo(update.created_at)
+  return (
+    <li className="text-xs bg-gray-950 border border-gray-800 rounded-lg px-3 py-2">
+      <div className="flex items-center justify-between text-gray-500 mb-1 gap-2">
+        <span className="font-medium text-gray-300 truncate">
+          {update.author_name}
+          {update.author_role && (
+            <span className="ml-1 text-[10px] uppercase text-gray-500">
+              · {update.author_role}
+            </span>
+          )}
+        </span>
+        <span className="whitespace-nowrap">{updateAgo}</span>
+      </div>
+      <TranslatableText text={update.body} />
+    </li>
+  )
+}

@@ -1,0 +1,93 @@
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { jwtDecode } from 'jwt-decode'
+import api from '../utils/api'
+
+const AuthContext = createContext(null)
+
+function parseToken(token) {
+  try {
+    const { sub, role, exp } = jwtDecode(token)
+    if (exp && exp * 1000 < Date.now()) return null
+    return { id: sub, role, exp }
+  } catch {
+    return null
+  }
+}
+
+function readInitialUser() {
+  const token = localStorage.getItem('token')
+  if (!token) return null
+  const parsed = parseToken(token)
+  if (!parsed) {
+    localStorage.removeItem('token')
+    localStorage.removeItem('name')
+    return null
+  }
+  return { ...parsed, name: localStorage.getItem('name') || '' }
+}
+
+export function AuthProvider({ children }) {
+  const [token, setToken] = useState(() => {
+    const t = localStorage.getItem('token')
+    return t && parseToken(t) ? t : null
+  })
+  const [user, setUser] = useState(readInitialUser)
+
+  const persist = useCallback((t, name) => {
+    localStorage.setItem('token', t)
+    localStorage.setItem('name', name)
+    setToken(t)
+    setUser({ ...parseToken(t), name })
+  }, [])
+
+  const login = useCallback(
+    async (email, password) => {
+      const { data } = await api.post('/api/auth/login', { email, password })
+      persist(data.token, data.name)
+      return data
+    },
+    [persist]
+  )
+
+  const register = useCallback(
+    async (payload) => {
+      const { data } = await api.post('/api/auth/register', payload)
+      persist(data.token, data.name)
+      return data
+    },
+    [persist]
+  )
+
+  const logout = useCallback(() => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('name')
+    setToken(null)
+    setUser(null)
+  }, [])
+
+  // Auto-logout if token expires while the tab is open
+  useEffect(() => {
+    if (!user?.exp) return
+    const ms = user.exp * 1000 - Date.now()
+    if (ms <= 0) return logout()
+    const id = setTimeout(logout, ms)
+    return () => clearTimeout(id)
+  }, [user, logout])
+
+  // Axios interceptor dispatches this on 401 so we can clear state here.
+  useEffect(() => {
+    const handler = () => logout()
+    window.addEventListener('auth:logout', handler)
+    return () => window.removeEventListener('auth:logout', handler)
+  }, [logout])
+
+  return (
+    <AuthContext.Provider value={{ token, user, login, register, logout }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+export function useAuth() {
+  return useContext(AuthContext)
+}
