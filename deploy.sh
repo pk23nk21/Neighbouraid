@@ -3,17 +3,17 @@
 # (AWS Lightsail, AWS EC2, Oracle Always Free, DigitalOcean, Hetzner, etc.)
 #
 # Usage (fresh VM):
-#   curl -fsSL https://raw.githubusercontent.com/parthkansal823/FSD-2/main/deploy.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/pk23nk21/NeighbourAid/main/deploy.sh | bash
 #
 # Or clone first and run it:
-#   git clone https://github.com/parthkansal823/FSD-2.git neighbouraid
+#   git clone https://github.com/pk23nk21/NeighbourAid.git neighbouraid
 #   cd neighbouraid && bash deploy.sh
 #
 # Re-runs are safe — it is idempotent.
 
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/parthkansal823/FSD-2.git}"
+REPO_URL="${REPO_URL:-https://github.com/pk23nk21/NeighbourAid.git}"
 APP_DIR="${APP_DIR:-$HOME/neighbouraid}"
 
 say() { printf '\n\033[1;36m==>\033[0m %s\n' "$*"; }

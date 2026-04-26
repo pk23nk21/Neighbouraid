@@ -69,7 +69,7 @@ For self-hosting on AWS Lightsail / EC2 / Oracle Always Free /
 DigitalOcean / Hetzner:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/parthkansal823/FSD-2/main/deploy.sh | bash
+curl -fsSL https://raw.githubusercontent.com/pk23nk21/NeighbourAid/main/deploy.sh | bash
 ```
 
 The script ([deploy.sh](../deploy.sh)) is idempotent. It:
@@ -95,7 +95,7 @@ docker run -d -p 80:80 -p 443:443 --name caddy caddy \
 
 The repo ships `render.yaml` for one-click setup:
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/parthkansal823/FSD-2)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/pk23nk21/NeighbourAid)
 
 The blueprint declares both services and prompts you only for
 `MONGO_URL`. Generated `JWT_SECRET` is opaque — you can rotate it

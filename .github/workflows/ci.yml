@@ -1,4 +1,4 @@
-name: CI
+name: NeighbourAid CI
 
 on:
   push:

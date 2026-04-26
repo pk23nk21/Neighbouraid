@@ -1,6 +1,6 @@
 # NeighbourAid — Hyperlocal Crisis & Help Network
 
-[![CI](https://github.com/parthkansal823/FSD-2/actions/workflows/ci.yml/badge.svg)](https://github.com/parthkansal823/FSD-2/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/pk23nk21/NeighbourAid/ci.yml?branch=main&label=CI&logo=github)](https://github.com/pk23nk21/NeighbourAid/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-143_passing-brightgreen)](docs/08-testing.md)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](backend/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)](backend/)
@@ -227,7 +227,7 @@ First build is ~10 min (HF model pre-download). Set
 ### One-command Ubuntu VM
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/parthkansal823/FSD-2/main/deploy.sh | bash
+curl -fsSL https://raw.githubusercontent.com/pk23nk21/NeighbourAid/main/deploy.sh | bash
 ```
 
 Works on AWS Lightsail, EC2, Oracle Always Free, DigitalOcean,
@@ -408,7 +408,7 @@ checklist. Summary:
 ### One-command Ubuntu
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/parthkansal823/FSD-2/main/deploy.sh | bash
+curl -fsSL https://raw.githubusercontent.com/pk23nk21/NeighbourAid/main/deploy.sh | bash
 ```
 
 [`deploy.sh`](deploy.sh) is idempotent — installs Docker, clones
