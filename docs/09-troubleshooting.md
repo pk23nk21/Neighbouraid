@@ -248,7 +248,36 @@ Two layers to debug:
 
 ---
 
-## 9.13 Render redeploy ran but I'm still seeing old code
+## 9.13 Backend crashes at startup with `No default database name defined or provided`
+
+Your `MONGO_URL` connection string is missing the database segment.
+Atlas's "Connect" wizard hands you a URL of the form:
+
+```
+mongodb+srv://user:pass@cluster.xxx.mongodb.net/?retryWrites=true&w=majority
+                                                ^ no /dbname here
+```
+
+Without a database name in the path, `get_default_database()` raises
+`ConfigurationError`.
+
+**Quick fix.** Add `/neighbouraid` before the `?`:
+
+```
+mongodb+srv://user:pass@cluster.xxx.mongodb.net/neighbouraid?retryWrites=true&w=majority
+```
+
+Save the env var; the host (HF Spaces / Render / etc.) restarts the
+container automatically.
+
+The code also has a defensive fallback: if `get_default_database()`
+raises, `app/db/client.py` falls back to a database literally named
+`neighbouraid`. Either form of the connection string works after
+that fix landed.
+
+---
+
+## 9.14 Render redeploy ran but I'm still seeing old code
 
 Vercel and Render deploy independently. If you only changed the
 frontend, you don't need a Render redeploy — Vercel handles it. But

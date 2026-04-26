@@ -1,18 +1,20 @@
-"""Tests for the security hardening layer.
+"""Tests for the security hardening + reliability layer.
 
 Covers:
   - Security-headers middleware applies on every response
   - Strengthened password rules (length, letter+digit complexity)
   - Per-IP rate limit on login + register + write endpoints
   - python-jose deprecation warning is silenced via pytest config
+  - DB connect fallback when the Atlas URL omits the database segment
 """
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from bson import ObjectId
+from pymongo.errors import ConfigurationError
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -190,3 +192,43 @@ async def test_rate_limiter_dependency_returns_429_message():
         await dep(_FakeReq())
     assert exc.value.status_code == 429
     assert "unit" in exc.value.detail
+
+
+# ──────────────────────────────────────────────────────────────────────
+# DB connect fallback — the most common HF Spaces deploy crash
+# ──────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_connect_falls_back_to_default_db_name():
+    """Atlas users routinely paste a connection string with no /dbname
+    segment, which makes `get_default_database()` raise. Our connect()
+    should fall back to the `neighbouraid` database silently."""
+    from app.db import client as db_client
+
+    # Build a fake Motor client that:
+    #   - raises ConfigurationError on get_default_database (the bug shape)
+    #   - returns a mock DB when subscripted by name (the fallback path)
+    fake_db = MagicMock()
+    fake_db.alerts.create_index = AsyncMock()
+    fake_db.users.create_index = AsyncMock()
+
+    fake_client = MagicMock()
+    fake_client.get_default_database = MagicMock(
+        side_effect=ConfigurationError("no default db")
+    )
+    fake_client.__getitem__ = MagicMock(return_value=fake_db)
+
+    with patch.object(
+        db_client, "AsyncIOMotorClient", return_value=fake_client
+    ):
+        # Cache the original to restore afterwards so we don't pollute
+        # other tests (the global fixture swaps _db too).
+        original = db_client._db
+        try:
+            await db_client.connect()
+            # The fallback should have indexed `neighbouraid`
+            fake_client.__getitem__.assert_called_with("neighbouraid")
+            assert db_client._db is fake_db
+        finally:
+            db_client._db = original
