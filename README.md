@@ -392,18 +392,23 @@ build cache.
 
 ## Deployment
 
-### Recommended — Vercel + Render + MongoDB Atlas (free tiers)
+### Recommended — Vercel + HuggingFace Spaces + MongoDB Atlas (no credit card)
 
-See [docs/07-deployment.md](docs/07-deployment.md) for the full
-checklist. Summary:
+The whole stack runs on free tiers that don't ask for a card. See
+[docs/07-deployment.md](docs/07-deployment.md) for the full
+click-by-click guide. Summary:
 
-- **MongoDB Atlas M0** in Mumbai → connection string into
+- **MongoDB Atlas M0** (Mumbai) → connection string into
   `MONGO_URL`.
-- **Render Web Service** (Docker) → set `JWT_SECRET`, `MONGO_URL`,
-  `NA_DISABLE_AI_MODEL=1` for the free tier.
-- **Vercel** → frontend root, set `VITE_API_URL` + `VITE_WS_URL`.
-- Optional: `RENDER_DEPLOY_HOOK` GitHub secret to auto-redeploy
-  on push to `main` (the deploy workflow pings it).
+- **HuggingFace Spaces** with the **Docker SDK** → 2 vCPU + 16 GB
+  RAM, supports WebSockets, never sleeps. Push `backend/` into the
+  Space's git repo, set `JWT_SECRET` + `MONGO_URL` + `FRONTEND_ORIGINS`
+  in the Space secrets. The Dockerfile honours `$PORT` so it works
+  on HF Spaces (7860), Render (10000), Railway, or local (8000)
+  without changes.
+- **Vercel** → frontend root `frontend/`, env vars
+  `VITE_API_URL=https://<owner>-<space>.hf.space` and
+  `VITE_WS_URL=wss://<owner>-<space>.hf.space`.
 
 ### One-command Ubuntu
 

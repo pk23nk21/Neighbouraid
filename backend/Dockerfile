@@ -2,14 +2,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Set to 1 in CI to skip the heavy model pre-download (1.6 GB).
+# Skip the heavy 1.6 GB HF model pre-download in environments that can't
+# afford the disk / build time (CI, low-RAM hosts using the heuristic
+# fallback). Set SKIP_MODEL_DOWNLOAD=1 to opt in.
 ARG SKIP_MODEL_DOWNLOAD=0
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download the HuggingFace model into the image so runtime needs no network.
-# Skippable in CI / tests where NA_DISABLE_AI_MODEL=1 uses the keyword heuristic.
+# Pre-download the HF model into the image so runtime never needs network.
 RUN if [ "$SKIP_MODEL_DOWNLOAD" = "0" ]; then \
       python -c "from transformers import pipeline; pipeline('zero-shot-classification', model='facebook/bart-large-mnli')"; \
     else \
@@ -18,5 +19,11 @@ RUN if [ "$SKIP_MODEL_DOWNLOAD" = "0" ]; then \
 
 COPY ./app ./app
 
+# Honour $PORT so the same image runs on:
+#   * Render (PORT=10000)
+#   * HuggingFace Spaces Docker SDK (PORT=7860)
+#   * Railway (PORT=...)
+#   * Bare uvicorn (PORT=8000 default, kept for backwards-compat)
+ENV PORT=8000
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

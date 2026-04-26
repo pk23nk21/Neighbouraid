@@ -1,192 +1,284 @@
-# 7. Deployment
+# 7. Deployment — free, no credit card
 
-NeighbourAid is small enough to deploy from a single VM, but the
-recommended path is the **Vercel + Render + MongoDB Atlas** split —
-all free tiers, no credit card.
+This guide walks through getting NeighbourAid live on the public
+internet using **only services that don't require a credit card**:
 
----
+| Layer | Service | Free tier |
+|---|---|---|
+| Frontend | **Vercel** | Free, no card, GitHub login |
+| Backend | **HuggingFace Spaces** (Docker SDK) | 2 vCPU + 16 GB RAM, no card, never sleeps |
+| Database | **MongoDB Atlas M0** | 512 MB, no card, Mumbai region |
 
-## 7.1 Recommended (Vercel + Render + Atlas)
+**Total time:** ~25 minutes start to finish.
 
-```
-       ┌──────────────┐    HTTPS / WSS   ┌──────────────┐
-       │  Vercel      │ ────────────────▶│  Render      │
-       │  Static SPA  │                   │  Docker app  │
-       │              │ ◀─────────────────│              │
-       └──────────────┘                   └──────┬───────┘
-                                                 │
-                                                 ▼
-                                          ┌──────────────┐
-                                          │  Atlas M0    │
-                                          │  Mumbai DC   │
-                                          └──────────────┘
-```
+You'll need three accounts (all free, all signup-with-email or
+GitHub-OAuth):
+1. [GitHub](https://github.com) — to push code
+2. [HuggingFace](https://huggingface.co/join) — for the backend
+3. [Vercel](https://vercel.com/signup) — for the frontend
+4. [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register) — for the database
 
-### 1. MongoDB Atlas (DB)
-- Create an M0 cluster in **Mumbai (ap-south-1)**.
-- Network access: `0.0.0.0/0` is the easiest for Render's dynamic IPs.
-- Create a DB user. Note the connection string —
-  `mongodb+srv://<user>:<pwd>@cluster.../neighbouraid`.
-
-### 2. Render (backend)
-- New Web Service → connect this repo → Docker.
-- Set env vars:
-  - `JWT_SECRET` — `openssl rand -hex 32`
-  - `MONGO_URL` — paste the Atlas string
-  - `NA_DISABLE_AI_MODEL=0` if you want the real HF model (needs a
-    paid 2 GB instance), `1` for the heuristic fallback (free tier OK).
-  - `FRONTEND_ORIGINS=https://your-vercel-app.vercel.app`
-- The free tier sleeps after 15 min of inactivity; first request
-  after a sleep takes ~30 s. Set up a cron-job.org ping to `/health`
-  every 10 min if you want it always-on.
-
-### 3. Vercel (frontend)
-- New project → import this repo → root dir `frontend/`.
-- Build command: `npm run build`. Output dir: `dist`.
-- Env vars:
-  - `VITE_API_URL=https://your-render-app.onrender.com`
-  - `VITE_WS_URL=wss://your-render-app.onrender.com`
-
-### 4. Trigger a Render redeploy on every push to main
-
-The repo ships `.github/workflows/deploy.yml` which POSTs the Render
-deploy hook. To enable:
-
-1. In Render, copy the **Deploy Hook URL** for your service.
-2. In GitHub repo → Settings → Secrets → New secret named
-   `RENDER_DEPLOY_HOOK`, paste the URL.
-3. Push to `main` → CI runs → on green, the deploy job pings the
-   hook → Render redeploys.
-
-If `RENDER_DEPLOY_HOOK` isn't set, the workflow logs a warning and
-exits 0, so it doesn't break the pipeline.
+Push your code to `https://github.com/pk23nk21/NeighbourAid` first —
+both Vercel and HuggingFace pull source from GitHub.
 
 ---
 
-## 7.2 One-command Ubuntu VM
+## Step 1 — MongoDB Atlas (5 min)
 
-For self-hosting on AWS Lightsail / EC2 / Oracle Always Free /
-DigitalOcean / Hetzner:
+1. Go to <https://www.mongodb.com/cloud/atlas/register> → sign up
+   with email or Google. **No card asked.**
+2. Click **Build a Database** → choose **M0 (Free)** → Provider
+   `AWS`, Region **Mumbai (ap-south-1)** → **Create**.
+3. **Create database user**: pick a username, click *Autogenerate
+   Secure Password*, copy it somewhere. Then click *Create User*.
+4. **Network access**: click *Add IP Address* → *Allow access from
+   anywhere* (`0.0.0.0/0`). Easiest for free-tier hosts whose IPs
+   change.
+5. Click **Connect** → *Drivers* → copy the connection string. It
+   looks like:
+
+   ```
+   mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority
+   ```
+
+6. Replace `<password>` with your real password and append the DB
+   name `neighbouraid` before the `?`:
+
+   ```
+   mongodb+srv://parth:HUNTER2@cluster0.xxxxx.mongodb.net/neighbouraid?retryWrites=true&w=majority
+   ```
+
+   Save this string — you'll paste it into the backend env vars in
+   Step 2.
+
+---
+
+## Step 2 — Backend on HuggingFace Spaces (10 min)
+
+HuggingFace Spaces is a free hosting platform meant for ML demos,
+but the **Docker SDK** option lets us run any container — including
+a full FastAPI server with WebSockets. The free tier is 2 vCPU and
+**16 GB RAM**, which is more than enough to run our backend with the
+real HF triage model loaded if you want.
+
+### 2a. Create the Space
+
+1. Go to <https://huggingface.co/new-space>.
+2. **Owner**: your username.
+3. **Space name**: `neighbouraid-api` (or whatever).
+4. **License**: `mit` (or whichever — required by the form).
+5. **Select the SDK**: choose **Docker** → *Blank*.
+6. **Space hardware**: keep `CPU basic · 2 vCPU · 16 GB · FREE`.
+7. **Visibility**: Public. (Private also works, but volunteers'
+   browsers can't connect to a private Space's API.)
+8. Click **Create Space**.
+
+### 2b. Connect your GitHub backend folder
+
+HuggingFace Spaces is itself a Git repo. The cleanest way to get
+your `backend/` folder up there is to **push the contents of
+`backend/`** into the Space's git repo as the root.
+
+```bash
+# in a new throwaway folder
+git clone https://huggingface.co/spaces/<your-hf-user>/neighbouraid-api
+cd neighbouraid-api
+
+# copy backend/ into the Space root
+cp -r /path/to/NeighbourAid/backend/. .
+
+# Spaces needs a README with frontmatter telling it the SDK + port
+cat > README.md <<'EOF'
+---
+title: NeighbourAid API
+emoji: 🛟
+colorFrom: orange
+colorTo: red
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+# NeighbourAid backend
+
+FastAPI backend for NeighbourAid. Source in
+[github.com/pk23nk21/NeighbourAid](https://github.com/pk23nk21/NeighbourAid).
+EOF
+
+git add .
+git commit -m "Initial deploy"
+git push
+```
+
+The Space starts building immediately. Watch progress at
+`https://huggingface.co/spaces/<you>/neighbouraid-api/logs` — the
+first build takes 6–8 min because it pre-downloads the HF triage
+model. (Set `SKIP_MODEL_DOWNLOAD=1` as a *Variable* under Space
+settings if you want a 30-second build that uses the keyword
+fallback.)
+
+> **Why `app_port: 7860`?** Spaces' Docker SDK exposes a single port
+> via their reverse proxy, fixed at 7860. Our Dockerfile honours
+> `$PORT` so the same image works on any host.
+
+### 2c. Add secrets
+
+Open your Space → **Settings** → **Variables and secrets**:
+
+| Name | Type | Value |
+|---|---|---|
+| `JWT_SECRET` | secret | Run `openssl rand -hex 32` and paste |
+| `MONGO_URL` | secret | The Atlas string from Step 1 |
+| `NA_DISABLE_AI_MODEL` | variable | `0` to load the real model, `1` for fallback |
+| `FRONTEND_ORIGINS` | variable | We'll fill this in Step 3 — leave for now |
+
+Save and the Space rebuilds automatically.
+
+### 2d. Verify the backend is up
+
+Hit `https://<you>-neighbouraid-api.hf.space/health` in a browser
+or with curl:
+
+```bash
+curl https://<you>-neighbouraid-api.hf.space/health
+# → {"status":"ok"}
+```
+
+The Swagger UI is at `https://<you>-neighbouraid-api.hf.space/docs`.
+
+**Note the URL pattern:** it's `<owner>-<spacename>.hf.space`, with
+**dashes** between owner and space name, not slashes.
+
+---
+
+## Step 3 — Frontend on Vercel (5 min)
+
+1. Push your code to GitHub if you haven't:
+   ```bash
+   git push origin main
+   ```
+2. Go to <https://vercel.com/new>.
+3. Click **Import Git Repository** → pick `pk23nk21/NeighbourAid`.
+4. Configure the project:
+   - **Framework Preset**: *Vite*
+   - **Root Directory**: `frontend` ← important
+   - **Build Command**: `npm run build` (auto-filled)
+   - **Output Directory**: `dist` (auto-filled)
+5. **Environment Variables** (click *Environment Variables* before
+   *Deploy*):
+
+   | Name | Value |
+   |---|---|
+   | `VITE_API_URL` | `https://<you>-neighbouraid-api.hf.space` |
+   | `VITE_WS_URL` | `wss://<you>-neighbouraid-api.hf.space` |
+
+6. Click **Deploy**. Vercel builds in ~60 seconds.
+7. Note your live URL — `https://neighbour-aid-xxxxx.vercel.app` or
+   the custom domain you set.
+
+---
+
+## Step 4 — Tell the backend about the frontend (1 min)
+
+Back to your HuggingFace Space → Settings → Variables → edit
+`FRONTEND_ORIGINS`:
+
+```
+https://neighbour-aid-xxxxx.vercel.app
+```
+
+(Comma-separate if you have multiple — preview branches, custom
+domain, etc.)
+
+The Space redeploys automatically. Without this, the browser will
+block your alert POSTs with a CORS error.
+
+---
+
+## Step 5 — Smoke test (3 min)
+
+Open your Vercel URL in two different browsers (or one normal + one
+incognito):
+
+1. **Reporter**: register as a reporter, post a test alert with GPS
+   somewhere in your city.
+2. **Volunteer**: register as a volunteer with your home GPS within
+   5 km of the test alert. Open the **Volunteer Feed**.
+3. The volunteer's feed should light up over WebSocket within a
+   couple of seconds, with toast + audio ping.
+4. Open `https://<you>-neighbouraid-api.hf.space/api/news/recent`
+   in a tab — first call is slow (~5 s) as it scrapes the four RSS
+   feeds; subsequent calls are instant for 5 minutes.
+
+If WebSocket doesn't connect, open DevTools → Network → WS tab. The
+URL should be `wss://<you>-neighbouraid-api.hf.space/ws/volunteer?
+token=…` — if it's `ws://` instead, your Vercel env vars need the
+`wss://` (TLS) variant.
+
+---
+
+## Updating
+
+- **Frontend changes**: `git push` → Vercel auto-deploys in ~60 s.
+- **Backend changes**: push to your `huggingface.co/spaces/.../...`
+  remote → the Space rebuilds automatically.
+
+If you keep both repos in sync, the easiest workflow is a small
+script that pushes `backend/` to the HF remote whenever you push to
+GitHub. Or just `git push` to both manually — the Space repo and
+the GitHub repo are independent.
+
+---
+
+## Alternatives (also no card)
+
+- **Cloudflare Pages** — drop-in replacement for Vercel for the
+  frontend. Free, fast CDN, no card.
+- **Netlify** — same role as Vercel, also no-card.
+- **Replit** — can host the backend in a Repl, but the free tier
+  sleeps after inactivity, which kills the WebSocket. Use
+  HuggingFace Spaces unless you need Repl-specific features.
+- **GitHub Pages** — works for the frontend if you set
+  `vite.config.js`'s `base` correctly. SPA routing requires a 404.html
+  hack. HuggingFace Spaces won't accept WS to a GH-Pages origin
+  without CORS, so prefer Vercel.
+
+---
+
+## Optional add-ons
+
+### One-command Ubuntu VM (if you ever get a VM)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/pk23nk21/NeighbourAid/main/deploy.sh | bash
 ```
 
-The script ([deploy.sh](../deploy.sh)) is idempotent. It:
+[`deploy.sh`](../deploy.sh) is idempotent — installs Docker, clones
+the repo, generates `JWT_SECRET`, runs `docker compose up -d`. Works
+on AWS Lightsail, EC2, Oracle Always Free, DigitalOcean, Hetzner.
 
-1. Installs Docker + Compose plugin.
-2. Clones (or pulls) the repo into `~/neighbouraid`.
-3. Generates a fresh `JWT_SECRET` if `.env` doesn't exist.
-4. Runs `docker compose up -d --build`.
+### Auto-redeploy on `git push` (CI hook)
 
-You'll need to open ports `3000` and `8000` in your cloud firewall.
-For HTTPS, put Caddy in front:
-
-```bash
-docker run -d -p 80:80 -p 443:443 --name caddy caddy \
-  caddy reverse-proxy --from yourdomain.com --to localhost:3000
-```
-
-(Or use Traefik, nginx, whatever you're comfortable with.)
+The repo ships `.github/workflows/deploy.yml` that POSTs to a
+configurable hook URL on every push to `main`. To use it with HF
+Spaces (which doesn't expose a deploy-hook URL), instead set up a
+GitHub Action that pushes `backend/` to the HF remote — pseudo-code
+in the workflow's comment block.
 
 ---
 
-## 7.3 Render Blueprint
+## Troubleshooting deployment
 
-The repo ships `render.yaml` for one-click setup:
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/pk23nk21/NeighbourAid)
-
-The blueprint declares both services and prompts you only for
-`MONGO_URL`. Generated `JWT_SECRET` is opaque — you can rotate it
-later from the Render dashboard.
-
----
-
-## 7.4 Post-deploy checklist
-
-- [ ] Frontend loads at `https://...vercel.app`. Health check at
-      `/health` (proxied) returns `{status:"ok"}`.
-- [ ] Backend `/docs` renders the Swagger UI.
-- [ ] Register a reporter + a volunteer from two browsers. Post an
-      alert from the reporter; the volunteer's `/volunteer` feed
-      should light up over WebSocket within ~1 second.
-- [ ] Open the volunteer feed → tap **Enable** for browser
-      notifications → background the tab → post another alert →
-      verify the native notification fires.
-- [ ] Open `/api/news/recent` directly — confirm the cache populates
-      (first call is slow ≈ 5 s as it scrapes 4 RSS feeds, subsequent
-      calls are instant for 5 minutes).
-- [ ] If you set `INBOUND_TOKEN`, send a test POST to
-      `/api/inbound/whatsapp` from `curl` and confirm the alert
-      appears in the volunteer feed.
-- [ ] Set up a cron-job.org ping to `/health` every 10 min if you're
-      on Render free tier.
+| Symptom | Likely cause |
+|---|---|
+| HF Space build fails on `pip install transformers` | Out of disk during build. Set `SKIP_MODEL_DOWNLOAD=1` and use `NA_DISABLE_AI_MODEL=1`. |
+| Frontend → backend gets blocked with CORS error | `FRONTEND_ORIGINS` in HF Space doesn't match your Vercel URL exactly. Include the full `https://...vercel.app`. |
+| WebSocket disconnects every few seconds | Your `VITE_WS_URL` is `ws://` instead of `wss://`. Edit Vercel env vars, redeploy. |
+| Atlas connection fails | Your IP allowlist isn't `0.0.0.0/0`, or the password in your connection string still has `<` and `>` literals. |
+| HF Space says "App not running" | Look at *Logs* tab — usually a missing env var or syntax error. The `/health` endpoint must return 200 within 60 s of container start. |
 
 ---
 
-## 7.5 Scaling notes
-
-### When to upgrade Render
-
-- **You need the real HF model** (not the heuristic fallback) — needs
-  ~2 GB RAM. Render free is 512 MB; you'd OOM.
-- **You expect simultaneous WebSocket connections > ~50** — free
-  tier limits.
-- **You can't tolerate the cold-start delay**.
-
-### When to upgrade Mongo
-
-Atlas M0 limits you to 512 MB and 100 connections. For a real
-deployment in a metro area, M10 (paid, ~$57/mo) is the next step.
-Geographic indexes scale fine — `2dsphere` queries are O(log n)
-in the index size.
-
-### Multi-region
-
-Currently single-region. If you want HA across regions:
-- Use Atlas M10+ with a multi-region replica set.
-- Run the backend in two Render regions behind a CDN.
-- The WebSocket manager is in-process — for multi-replica you'd
-  need a Redis pub/sub bus to fan broadcasts across replicas.
-  See `services/websocket.py` for the swap point.
-
-### CDN
-
-Vercel does this for the frontend automatically. The static CSS+JS
-bundle is ~155 KB gzipped, which is tiny — caching pays off
-mainly for repeat visitors and Service Worker pre-cache.
-
----
-
-## 7.6 Rolling back
-
-### Render
-Go to the service's **Deploys** tab → Rollback to the previous green
-deploy. Takes ~30 s.
-
-### Vercel
-**Deployments** tab → click the previous successful deploy →
-**Promote to Production**. Takes ~5 s.
-
-### Database
-
-There's no backwards-incompatible schema change in this repo so far,
-but if you ever ship one and need to roll back the backend:
-
-1. Render rollback first.
-2. Don't drop fields the *new* code wrote. Old code will ignore
-   them, which is fine — every backend route uses Mongo's natural
-   permissive shape (`doc.get(field, default)`).
-
----
-
-## 7.7 Logs + observability
-
-- Render's built-in logs view captures stdout/stderr from uvicorn.
-- The backend logs structured JSON for warnings/errors and prints
-  exception tracebacks for any 500 (the global exception handler
-  converts them to `{"detail": "Internal server error"}` for the
-  client, but logs the full trace).
-- For real observability, plug Render into Datadog / Sentry / New
-  Relic — not enabled by default to keep the free-stack pure.
+For step-by-step user-facing docs (registering, posting, accepting
+alerts), see [02-user-guide.md](02-user-guide.md). For dev setup,
+see [06-development.md](06-development.md).
