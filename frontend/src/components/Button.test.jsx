@@ -36,7 +36,8 @@ describe('<Button />', () => {
 
   it('applies the danger tone class for variant="danger"', () => {
     render(<Button variant="danger">Cancel alert</Button>)
-    expect(screen.getByRole('button').className).toContain('bg-red-600')
+    expect(screen.getByRole('button').className).toContain('from-red-500')
+    expect(screen.getByRole('button').className).toContain('to-red-600')
   })
 
   it('applies a full-width class when full=true', () => {

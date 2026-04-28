@@ -13,8 +13,8 @@ describe('<Skeleton /> primitives', () => {
   it('SkeletonCard renders the requested number of body lines', () => {
     const { container } = render(<SkeletonCard lines={4} />)
     const lines = container.querySelectorAll('.skeleton')
-    // 2 header skeletons + 4 body lines
-    expect(lines.length).toBe(6)
+    // 3 header skeletons + 4 body lines + 2 footer chips
+    expect(lines.length).toBe(9)
   })
 
   it('SkeletonAlertList renders count cards with the right ARIA role', () => {
@@ -22,6 +22,6 @@ describe('<Skeleton /> primitives', () => {
     const status = screen.getByRole('status')
     expect(status).toHaveAttribute('aria-label', expect.stringContaining('Loading'))
     // 2 cards × (2 header + 3 body) = 10 shimmer blocks
-    expect(status.querySelectorAll('.skeleton').length).toBe(10)
+    expect(status.querySelectorAll('.skeleton').length).toBe(16)
   })
 })
