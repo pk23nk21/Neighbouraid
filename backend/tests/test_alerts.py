@@ -12,6 +12,18 @@ def _reporter_token():
     return create_token({"sub": str(ObjectId()), "role": "reporter"})
 
 
+def _cursor_from_docs(docs):
+    async def iterate():
+        for doc in docs:
+            yield doc
+
+    cursor = MagicMock()
+    cursor.limit = MagicMock(return_value=iterate())
+    cursor.sort = MagicMock(return_value=iterate())
+    cursor.__aiter__ = lambda _self: iterate()
+    return cursor
+
+
 @pytest.mark.asyncio
 async def test_get_nearby_is_public(client):
     c, db = client
@@ -61,6 +73,96 @@ async def test_get_nearby_returns_list(client):
     )
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_get_nearby_includes_skill_match_for_volunteer(client):
+    c, db = client
+    volunteer_id = ObjectId()
+    db.users.find_one = AsyncMock(
+        return_value={"_id": volunteer_id, "skills": ["medical"], "has_vehicle": True}
+    )
+    db.alerts.update_many = AsyncMock()
+    db.alerts.find = MagicMock(
+        return_value=_cursor_from_docs(
+            [
+                {
+                    "_id": ObjectId(),
+                    "reporter_id": ObjectId(),
+                    "category": "medical",
+                    "description": "Elderly person collapsed near the market",
+                    "urgency": "HIGH",
+                    "urgency_reason": "",
+                    "location": {
+                        "type": "Point",
+                        "coordinates": [76.8844, 30.7333],  # ~10 km east
+                    },
+                    "status": "open",
+                    "accepted_by": None,
+                    "created_at": "2026-04-24T00:00:00+00:00",
+                    "resolved_at": None,
+                    "flags": 0,
+                }
+            ]
+        )
+    )
+
+    token = create_token({"sub": str(volunteer_id), "role": "volunteer"})
+    resp = await c.get(
+        "/api/alerts/nearby",
+        params={"lat": 30.7333, "lng": 76.7794, "km": 5},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1
+    assert body[0]["is_skill_match"] is True
+    assert body[0]["your_has_vehicle"] is True
+    assert body[0]["your_distance_km"] > 5
+
+
+@pytest.mark.asyncio
+async def test_get_nearby_excludes_non_matching_volunteer_outside_radius(client):
+    c, db = client
+    volunteer_id = ObjectId()
+    db.users.find_one = AsyncMock(
+        return_value={"_id": volunteer_id, "skills": ["swim"], "has_vehicle": False}
+    )
+    db.alerts.update_many = AsyncMock()
+    db.alerts.find = MagicMock(
+        return_value=_cursor_from_docs(
+            [
+                {
+                    "_id": ObjectId(),
+                    "reporter_id": ObjectId(),
+                    "category": "medical",
+                    "description": "Need CPR support urgently",
+                    "urgency": "HIGH",
+                    "urgency_reason": "",
+                    "location": {
+                        "type": "Point",
+                        "coordinates": [76.8844, 30.7333],  # ~10 km east
+                    },
+                    "status": "open",
+                    "accepted_by": None,
+                    "created_at": "2026-04-24T00:00:00+00:00",
+                    "resolved_at": None,
+                    "flags": 0,
+                }
+            ]
+        )
+    )
+
+    token = create_token({"sub": str(volunteer_id), "role": "volunteer"})
+    resp = await c.get(
+        "/api/alerts/nearby",
+        params={"lat": 30.7333, "lng": 76.7794, "km": 5},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == []
 
 
 @pytest.mark.asyncio

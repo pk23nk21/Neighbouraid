@@ -3,6 +3,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
+from bson import ObjectId
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from .core.security import decode_token_safe
 from .core.security_headers import SecurityHeadersMiddleware
-from .db.client import connect, disconnect
+from .db.client import connect, disconnect, get_db
 from .routes import alerts, auth, inbound, news, resources, safety, stats, users
 from .services.websocket import manager
 
@@ -133,6 +134,13 @@ async def volunteer_ws(websocket: WebSocket, token: str):
 
     await websocket.accept()
     vol_id = payload["sub"]
+    db = get_db()
+    profile = await db.users.find_one(
+        {"_id": ObjectId(vol_id)},
+        {"skills": 1, "has_vehicle": 1},
+    )
+    skills = list((profile or {}).get("skills") or [])
+    has_vehicle = bool((profile or {}).get("has_vehicle", False))
 
     try:
         # First message must carry the volunteer's coordinates: {"coordinates": [lng, lat]}
@@ -149,10 +157,26 @@ async def volunteer_ws(websocket: WebSocket, token: str):
             await websocket.close(code=4002)
             return
 
-        manager.register(vol_id, websocket, [lng, lat])
+        manager.register(vol_id, websocket, [lng, lat], skills=skills, has_vehicle=has_vehicle)
         while True:
-            # subsequent frames ignored — keep-alive only
-            await websocket.receive_text()
+            raw = await websocket.receive_text()
+            try:
+                loc = json.loads(raw)
+                coords = loc["coordinates"]
+                if not (isinstance(coords, list) and len(coords) == 2):
+                    continue
+                lng, lat = float(coords[0]), float(coords[1])
+                if not (-180 <= lng <= 180 and -90 <= lat <= 90):
+                    continue
+            except (ValueError, KeyError, TypeError):
+                continue
+            manager.register(
+                vol_id,
+                websocket,
+                [lng, lat],
+                skills=skills,
+                has_vehicle=has_vehicle,
+            )
     except WebSocketDisconnect:
         pass
     finally:

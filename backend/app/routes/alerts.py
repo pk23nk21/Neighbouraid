@@ -7,7 +7,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..core.limits import limit_write
-from ..core.security import get_current_user, require_role
+from ..core.security import decode_token_safe, get_current_user, require_role
 from ..db.client import get_db
 from ..models.alert import AlertCreate, ETAUpdate
 from ..services.ai import generate_headline, similarity, triage as ai_triage
@@ -22,7 +22,12 @@ from ..services.verification import (
 )
 from ..services.weather import current_weather, supports_category
 from ..services.webhook import fire_alert_created
-from ..services.websocket import manager
+from ..services.websocket import (
+    CATEGORY_PREFERRED_SKILLS,
+    DEFAULT_RADIUS_KM,
+    SKILL_RADIUS_KM,
+    manager,
+)
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 
@@ -194,6 +199,37 @@ async def _auto_escalate_unaccepted(db) -> list[dict]:
     return bumped
 
 
+async def _volunteer_context_from_request(request: Request, db) -> dict | None:
+    """Best-effort auth parsing for the public /nearby feed.
+
+    Volunteers get a richer result set: alerts that match their skills can
+    extend beyond the default radius, and each alert includes distance /
+    skill-match metadata. Anonymous/public callers keep the simpler radius-only
+    behavior.
+    """
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer "):
+        return None
+
+    payload = decode_token_safe(auth.split(" ", 1)[1].strip())
+    if not payload or payload.get("role") != "volunteer":
+        return None
+
+    try:
+        user = await db.users.find_one(
+            {"_id": ObjectId(payload["sub"])},
+            {"skills": 1, "has_vehicle": 1},
+        )
+    except (InvalidId, TypeError):
+        return None
+
+    return {
+        "id": payload["sub"],
+        "skills": list((user or {}).get("skills") or []),
+        "has_vehicle": bool((user or {}).get("has_vehicle", False)),
+    }
+
+
 @router.get("/mine")
 async def my_alerts(payload: dict = Depends(require_role("reporter"))):
     db = get_db()
@@ -205,8 +241,9 @@ async def my_alerts(payload: dict = Depends(require_role("reporter"))):
 
 
 @router.get("/nearby")
-async def get_nearby(lat: float, lng: float, km: float = 5.0):
+async def get_nearby(request: Request, lat: float, lng: float, km: float = 5.0):
     db = get_db()
+    volunteer = await _volunteer_context_from_request(request, db)
     # Opportunistic cleanups on each list read — no cron needed.
     await _auto_resolve_stale(db)
     bumped = await _auto_escalate_unaccepted(db)
@@ -216,12 +253,13 @@ async def get_nearby(lat: float, lng: float, km: float = 5.0):
             await manager.broadcast_nearby(_serialize(doc, include_photos=False))
         except Exception:  # noqa: BLE001
             pass
+    query_radius_km = max(km, SKILL_RADIUS_KM) if volunteer else km
     cursor = db.alerts.find(
         {
             "location": {
                 "$nearSphere": {
                     "$geometry": {"type": "Point", "coordinates": [lng, lat]},
-                    "$maxDistance": int(km * 1000),
+                    "$maxDistance": int(query_radius_km * 1000),
                 }
             },
             "status": {"$ne": "resolved"},
@@ -230,7 +268,26 @@ async def get_nearby(lat: float, lng: float, km: float = 5.0):
         },
         _LIST_PROJECTION,
     ).limit(100)
-    return [_serialize(doc, include_photos=False) async for doc in cursor]
+
+    if not volunteer:
+        return [_serialize(doc, include_photos=False) async for doc in cursor]
+
+    preferred_skills = set(volunteer["skills"])
+    out = []
+    async for doc in cursor:
+        item = _serialize(doc, include_photos=False)
+        a_lng, a_lat = item["location"]["coordinates"]
+        distance_km = _haversine_m(lat, lng, a_lat, a_lng) / 1000
+        category_skills = set(CATEGORY_PREFERRED_SKILLS.get(item.get("category", "other"), []))
+        skill_match = bool(preferred_skills.intersection(category_skills))
+        effective_radius = SKILL_RADIUS_KM if skill_match else max(km, DEFAULT_RADIUS_KM)
+        if distance_km > effective_radius:
+            continue
+        item["is_skill_match"] = skill_match
+        item["your_distance_km"] = round(distance_km, 2)
+        item["your_has_vehicle"] = volunteer["has_vehicle"]
+        out.append(item)
+    return out
 
 
 @router.get("/heatmap")
