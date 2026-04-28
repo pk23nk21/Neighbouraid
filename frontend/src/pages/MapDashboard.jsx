@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import MapView from '../components/MapView'
 import api from '../utils/api'
 import { apiError } from '../utils/error'
@@ -8,8 +9,17 @@ const URGENCY_FILTERS = ['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
 const CATEGORIES = ['all', 'medical', 'flood', 'fire', 'missing', 'power', 'other']
 const FALLBACK_CENTER = [30.7333, 76.7794] // Chandigarh
 
+function parseLatLng(s) {
+  if (!s) return null
+  const parts = s.split(',').map((x) => parseFloat(x.trim()))
+  if (parts.length !== 2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) return null
+  if (Math.abs(parts[0]) > 90 || Math.abs(parts[1]) > 180) return null
+  return parts
+}
+
 export default function MapDashboard() {
   const { t } = useI18n()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [alerts, setAlerts] = useState([])
   const [urgencyFilter, setUrgencyFilter] = useState('ALL')
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -23,6 +33,21 @@ export default function MapDashboard() {
   const [showHeat, setShowHeat] = useState(false)
   const [heatPoints, setHeatPoints] = useState([])
   const watchIdRef = useRef(null)
+
+  // Parse ?dest=lat,lng&focus=alertId — these come from "Directions" links
+  // throughout the app (alert cards, share pages, resource pins).
+  const destination = useMemo(
+    () => parseLatLng(searchParams.get('dest')),
+    [searchParams]
+  )
+  const focusId = searchParams.get('focus') || null
+
+  const clearDestination = useCallback(() => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('dest')
+    next.delete('focus')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   // Start a live geolocation watch — coords + accuracy + timestamp update as
   // the browser/device reports fresher fixes. This keeps "My location" truly
@@ -44,8 +69,6 @@ export default function MapDashboard() {
       setLocationError(err.message || 'Unable to read location')
       setLocating(false)
     }
-    // getCurrentPosition gives us a fix immediately; watchPosition then keeps
-    // it fresh as the device moves (or accuracy improves).
     navigator.geolocation.getCurrentPosition(onOk, onErr, {
       enableHighAccuracy: true,
       timeout: 15000,
@@ -68,7 +91,6 @@ export default function MapDashboard() {
     let cancelled = false
 
     const fetchAlerts = async () => {
-      // Skip polling when the tab is hidden — the map isn't visible anyway
       if (document.visibilityState === 'hidden') return
       try {
         const { data } = await api.get('/api/alerts/nearby', {
@@ -97,9 +119,6 @@ export default function MapDashboard() {
     }
   }, [userCenter, t])
 
-  // Fetch heatmap points only when the overlay is enabled. The endpoint
-  // returns a compact [lat, lng, weight] list (no descriptions/photos), so
-  // we can refresh it on a longer cadence than the main marker list.
   useEffect(() => {
     if (!showHeat) return undefined
     const center = userCenter ?? FALLBACK_CENTER
@@ -171,23 +190,26 @@ export default function MapDashboard() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-57px)]">
-      <div className="bg-gray-900 border-b border-gray-800 px-3 sm:px-6 py-2 sm:py-3 space-y-2">
+      <div className="glass border-b border-gray-800 px-3 sm:px-6 py-2 sm:py-3 space-y-2 shadow-md shadow-black/30">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <span className="text-white font-semibold text-sm sm:text-base">{t('map_title')}</span>
+          <span className="text-white font-semibold text-sm sm:text-base inline-flex items-center gap-2">
+            <span aria-hidden className="text-base">🗺️</span>
+            {t('map_title')}
+          </span>
           <div className="flex gap-1.5 flex-wrap">
             {URGENCY_FILTERS.map((f) => (
               <button
                 key={f}
                 onClick={() => setUrgencyFilter(f)}
-                className={`text-[11px] sm:text-xs px-2.5 sm:px-3 py-1 rounded-full border transition-colors ${
+                className={`text-[11px] sm:text-xs px-2.5 sm:px-3 py-1 rounded-full border transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${
                   urgencyFilter === f
-                    ? 'border-orange-500 bg-orange-500/20 text-orange-400'
-                    : 'border-gray-700 text-gray-400 hover:border-gray-500'
+                    ? 'border-orange-500 bg-gradient-to-b from-orange-500/30 to-orange-500/10 text-orange-200 shadow-sm shadow-orange-500/20'
+                    : 'border-gray-700 text-gray-400 hover:border-orange-500/40 hover:text-gray-200'
                 }`}
               >
                 {f === 'ALL' ? t('map_all') : f}
                 {f !== 'ALL' && urgencyCounts[f] ? (
-                  <span className="ml-1 text-gray-500">({urgencyCounts[f]})</span>
+                  <span className="ml-1 text-gray-500 tabular-nums">({urgencyCounts[f]})</span>
                 ) : null}
               </button>
             ))}
@@ -197,9 +219,14 @@ export default function MapDashboard() {
               ? t('map_loading')
               : error
               ? error
-              : `${visible.length} ${
-                  visible.length !== 1 ? t('map_active_alerts_many') : t('map_active_alerts_one')
-                } · ${t('map_refresh_note')}`}
+              : (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="tabular-nums">{visible.length}</span>{' '}
+                  {visible.length !== 1 ? t('map_active_alerts_many') : t('map_active_alerts_one')}{' '}
+                  · {t('map_refresh_note')}
+                </span>
+              )}
           </span>
         </div>
 
@@ -208,15 +235,15 @@ export default function MapDashboard() {
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat)}
-              className={`text-[11px] sm:text-xs px-2.5 sm:px-3 py-1 rounded-full border transition-colors ${
+              className={`text-[11px] sm:text-xs px-2.5 sm:px-3 py-1 rounded-full border transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${
                 categoryFilter === cat
-                  ? 'border-blue-500 bg-blue-500/20 text-blue-300'
-                  : 'border-gray-700 text-gray-500 hover:border-gray-500'
+                  ? 'border-blue-500 bg-gradient-to-b from-blue-500/30 to-blue-500/10 text-blue-200 shadow-sm shadow-blue-500/20'
+                  : 'border-gray-700 text-gray-500 hover:border-blue-500/40 hover:text-gray-300'
               }`}
             >
               {cat === 'all' ? t('map_all') : t(`cat_${cat}`)}
               {cat !== 'all' && categoryCounts[cat] ? (
-                <span className="ml-1 text-gray-500">({categoryCounts[cat]})</span>
+                <span className="ml-1 text-gray-500 tabular-nums">({categoryCounts[cat]})</span>
               ) : null}
             </button>
           ))}
@@ -225,15 +252,24 @@ export default function MapDashboard() {
         <div className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
           <span className="truncate flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" />
-            <span className="truncate">📍 {locStatus}</span>
+            <span className="truncate tabular-nums">📍 {locStatus}</span>
           </span>
           <div className="flex items-center gap-2 shrink-0">
+            {destination && (
+              <button
+                onClick={clearDestination}
+                className="text-xs border border-orange-700/60 bg-orange-500/15 text-orange-300 hover:bg-orange-500/25 hover:text-orange-200 px-2 py-0.5 rounded-md transition-all duration-200"
+                title="Clear destination"
+              >
+                ✕ Clear route
+              </button>
+            )}
             <button
               onClick={() => setShowHeat((v) => !v)}
-              className={`text-xs border px-2 py-0.5 rounded-md transition-colors ${
+              className={`text-xs border px-2 py-0.5 rounded-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${
                 showHeat
-                  ? 'border-orange-500 bg-orange-500/20 text-orange-300'
-                  : 'border-gray-700 text-gray-300 hover:border-gray-500'
+                  ? 'border-orange-500 bg-gradient-to-b from-orange-500/30 to-orange-500/10 text-orange-200 shadow-sm shadow-orange-500/20'
+                  : 'border-gray-700 text-gray-300 hover:border-orange-500/40'
               }`}
               title="Toggle 72-hour heatmap overlay"
             >
@@ -242,10 +278,19 @@ export default function MapDashboard() {
             <button
               onClick={recenterNow}
               disabled={locating}
-              className="text-xs border border-gray-700 hover:border-gray-500 text-gray-300 px-2 py-0.5 rounded-md transition-colors disabled:opacity-50"
+              className="text-xs border border-gray-700 hover:border-blue-500/60 hover:text-white text-gray-300 px-2 py-0.5 rounded-md transition-all duration-200 disabled:opacity-50 hover:-translate-y-0.5 active:translate-y-0"
               title="Recenter to current location"
             >
-              {locating ? '…' : '⟳'}
+              {locating ? (
+                <span className="inline-flex items-center gap-1">
+                  <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                    <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                </span>
+              ) : (
+                '⟳'
+              )}
             </button>
           </div>
         </div>
@@ -258,6 +303,9 @@ export default function MapDashboard() {
           accuracy={locationAccuracy}
           heatPoints={heatPoints}
           showHeat={showHeat}
+          destination={destination}
+          focusId={focusId}
+          onClearDestination={clearDestination}
         />
       </div>
     </div>

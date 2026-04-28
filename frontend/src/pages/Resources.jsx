@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../utils/i18n'
 import api from '../utils/api'
@@ -17,7 +18,7 @@ const KIND_META = {
 
 const KINDS = Object.keys(KIND_META)
 
-function ResourceCard({ pin, mineId, onDelete }) {
+function ResourceCard({ pin, mineId, onDelete, index = 0 }) {
   const meta = KIND_META[pin.kind] || KIND_META.other
   const expires = pin.expires_at ? new Date(pin.expires_at) : null
   const expiresIn = expires ? Math.max(0, Math.floor((expires - Date.now()) / 60000)) : null
@@ -25,28 +26,45 @@ function ResourceCard({ pin, mineId, onDelete }) {
   const lat = pin.location?.coordinates?.[1]
   const lng = pin.location?.coordinates?.[0]
   const directions = lat != null && lng != null
-    ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+    ? `/map?dest=${lat},${lng}`
     : null
+  const expiringSoon = expiresIn !== null && expiresIn <= 60
 
   return (
-    <li className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+    <li
+      className="group bg-gradient-to-br from-gray-900 to-gray-900/60 border border-gray-800 rounded-xl px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-700 hover:shadow-lg hover:shadow-black/40 reveal-up"
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="text-white font-semibold truncate">
-            <span aria-hidden className="mr-1.5">{meta.icon}</span>
-            {pin.name}
-          </h3>
-          <p className="text-xs text-gray-400 mt-0.5 capitalize">{meta.label}{pin.owner_name ? ` · ${pin.owner_name}` : ''}</p>
+        <div className="min-w-0 flex items-start gap-2">
+          <span
+            aria-hidden
+            className="text-2xl shrink-0 mt-0.5 transition-transform duration-300 group-hover:scale-110"
+          >
+            {meta.icon}
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-white font-semibold truncate">{pin.name}</h3>
+            <p className="text-xs text-gray-400 mt-0.5 capitalize">
+              {meta.label}{pin.owner_name ? ` · ${pin.owner_name}` : ''}
+            </p>
+          </div>
         </div>
         {expiresIn !== null && (
-          <span className="text-[10px] uppercase tracking-wider text-gray-500 shrink-0">
+          <span
+            className={`text-[10px] uppercase tracking-wider shrink-0 px-2 py-0.5 rounded-full border tabular-nums ${
+              expiringSoon
+                ? 'text-amber-300 bg-amber-950/40 border-amber-800/60'
+                : 'text-gray-400 bg-gray-800/60 border-gray-700/60'
+            }`}
+          >
             {expiresIn > 60 ? `${Math.floor(expiresIn / 60)}h left` : `${expiresIn}m left`}
           </span>
         )}
       </div>
       <div className="text-xs text-gray-300 mt-2 space-y-1">
         {pin.capacity != null && (
-          <div><span className="text-gray-500">Capacity:</span> {pin.capacity}</div>
+          <div><span className="text-gray-500">Capacity:</span> <span className="tabular-nums">{pin.capacity}</span></div>
         )}
         {pin.contact && (
           <div><span className="text-gray-500">Contact:</span> {pin.contact}</div>
@@ -57,19 +75,17 @@ function ResourceCard({ pin, mineId, onDelete }) {
       </div>
       <div className="flex items-center justify-between mt-3 gap-2">
         {directions ? (
-          <a
-            href={directions}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs text-blue-300 hover:text-blue-200"
+          <Link
+            to={directions}
+            className="text-xs text-blue-300 hover:text-blue-200 underline-offset-2 hover:underline transition-colors inline-flex items-center gap-1"
           >
             🧭 Directions
-          </a>
+          </Link>
         ) : <span />}
         {isMine && (
           <button
             onClick={() => onDelete(pin.id)}
-            className="text-xs text-red-400 hover:text-red-300"
+            className="text-xs text-red-400 hover:text-red-300 transition-colors"
           >
             Remove
           </button>
@@ -188,23 +204,27 @@ export default function Resources() {
   // via owner name match as a soft signal. Backend still enforces ownership.
   const mineMarker = user?.name || null
 
+  const inputCls =
+    'w-full bg-gray-800/80 border border-gray-700 text-white rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:bg-gray-800 transition-all duration-200 placeholder:text-gray-600'
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
-      <div className="mb-5 sm:mb-6">
+      <div className="mb-5 sm:mb-6 reveal-up">
         <h1 className="text-xl sm:text-2xl font-bold text-white">{t('res_title')}</h1>
         <p className="text-gray-400 text-sm mt-1">{t('res_subtitle')}</p>
       </div>
 
       {error && (
-        <div className="bg-red-950 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3 mb-6">
-          {error}
+        <div className="bg-red-950/70 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 flex items-start gap-2 pop-in">
+          <span aria-hidden className="text-base shrink-0 mt-px">⚠️</span>
+          <span>{error}</span>
         </div>
       )}
 
       {user ? (
         <form
           onSubmit={onSubmit}
-          className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-5 mb-6 space-y-3"
+          className="bg-gradient-to-br from-gray-900 to-gray-900/60 border border-gray-800 rounded-xl p-4 sm:p-5 mb-6 space-y-3 reveal-up stagger-1 shadow-lg shadow-black/20"
         >
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest">
             {t('res_pin_a_resource')}
@@ -215,10 +235,10 @@ export default function Resources() {
                 key={k}
                 type="button"
                 onClick={() => setKind(k)}
-                className={`text-xs px-3 py-2 rounded-lg border transition-colors ${
+                className={`text-xs px-3 py-2 rounded-lg border transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 ${
                   kind === k
-                    ? 'border-orange-500 bg-orange-500/15 text-orange-200'
-                    : 'border-gray-700 text-gray-300 hover:border-gray-500'
+                    ? 'border-orange-500 bg-gradient-to-b from-orange-500/25 to-orange-500/10 text-orange-200 shadow-sm shadow-orange-500/15'
+                    : 'border-gray-700 text-gray-300 hover:border-orange-500/40 hover:bg-gray-800/40'
                 }`}
               >
                 <span aria-hidden className="mr-1">{KIND_META[k].icon}</span>
@@ -233,7 +253,7 @@ export default function Resources() {
             placeholder={t('res_name_ph')}
             maxLength={120}
             required
-            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-orange-500"
+            className={inputCls}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <input
@@ -242,7 +262,7 @@ export default function Resources() {
               onChange={(e) => setContact(e.target.value)}
               placeholder={t('res_contact_ph')}
               maxLength={120}
-              className="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-orange-500"
+              className={inputCls}
             />
             <input
               type="number"
@@ -251,7 +271,7 @@ export default function Resources() {
               value={capacity}
               onChange={(e) => setCapacity(e.target.value)}
               placeholder={t('res_capacity_ph')}
-              className="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-orange-500"
+              className={`${inputCls} tabular-nums`}
             />
           </div>
           <textarea
@@ -260,7 +280,7 @@ export default function Resources() {
             placeholder={t('res_notes_ph')}
             maxLength={500}
             rows={2}
-            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-orange-500"
+            className={inputCls}
           />
           <div className="flex items-center gap-2 text-xs text-gray-400">
             <label htmlFor="res-valid">{t('res_valid_for')}</label>
@@ -271,21 +291,25 @@ export default function Resources() {
               max="336"
               value={validHours}
               onChange={(e) => setValidHours(e.target.value)}
-              className="w-20 bg-gray-800 border border-gray-700 text-white rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-orange-500"
+              className="w-20 bg-gray-800/80 border border-gray-700 text-white rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all tabular-nums"
             />
             <span>{t('res_hours')}</span>
           </div>
           <button
             type="submit"
             disabled={posting || !coords}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors"
+            className="group relative w-full bg-gradient-to-b from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg shadow-md shadow-orange-500/20 hover:shadow-orange-500/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] overflow-hidden"
           >
-            {posting ? t('res_posting') : t('res_post')}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent skew-x-12 -translate-x-full group-hover:translate-x-[400%] transition-transform duration-700 ease-out"
+            />
+            <span className="relative">{posting ? t('res_posting') : t('res_post')}</span>
           </button>
         </form>
       ) : (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-5 mb-6 text-sm text-gray-400">
-          <a href="/login" className="text-orange-400 hover:text-orange-300">
+          <a href="/login" className="text-orange-400 hover:text-orange-300 underline-offset-2 hover:underline">
             {t('safety_sign_in')}
           </a>{' '}
           {t('res_sign_in_to')}
@@ -295,17 +319,17 @@ export default function Resources() {
       <section>
         <div className="flex items-center justify-between mb-3 gap-2">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest">
-            {t('res_nearby')} · {filtered.length}
+            {t('res_nearby')} · <span className="tabular-nums">{filtered.length}</span>
           </h2>
         </div>
         <div className="flex flex-wrap gap-1.5 mb-3">
           <button
             type="button"
             onClick={() => setFilter('all')}
-            className={`text-[11px] px-2.5 py-1 rounded-full border ${
+            className={`text-[11px] px-2.5 py-1 rounded-full border transition-all duration-200 hover:-translate-y-0.5 ${
               filter === 'all'
-                ? 'border-orange-500 bg-orange-500/15 text-orange-200'
-                : 'border-gray-700 text-gray-400 hover:border-gray-500'
+                ? 'border-orange-500 bg-orange-500/15 text-orange-200 shadow-sm shadow-orange-500/15'
+                : 'border-gray-700 text-gray-400 hover:border-orange-500/40 hover:text-gray-200'
             }`}
           >
             {t('res_all')}
@@ -315,10 +339,10 @@ export default function Resources() {
               key={k}
               type="button"
               onClick={() => setFilter(k)}
-              className={`text-[11px] px-2.5 py-1 rounded-full border ${
+              className={`text-[11px] px-2.5 py-1 rounded-full border transition-all duration-200 hover:-translate-y-0.5 ${
                 filter === k
-                  ? 'border-orange-500 bg-orange-500/15 text-orange-200'
-                  : 'border-gray-700 text-gray-400 hover:border-gray-500'
+                  ? 'border-orange-500 bg-orange-500/15 text-orange-200 shadow-sm shadow-orange-500/15'
+                  : 'border-gray-700 text-gray-400 hover:border-orange-500/40 hover:text-gray-200'
               }`}
             >
               <span aria-hidden className="mr-1">{KIND_META[k].icon}</span>
@@ -336,12 +360,13 @@ export default function Resources() {
           />
         ) : (
           <ul className="space-y-2.5">
-            {filtered.map((p) => (
+            {filtered.map((p, i) => (
               <ResourceCard
                 key={p.id}
                 pin={p}
                 mineId={mineMarker && p.owner_name === mineMarker ? p.owner_id : null}
                 onDelete={onDelete}
+                index={i}
               />
             ))}
           </ul>

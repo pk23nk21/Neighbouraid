@@ -1,6 +1,6 @@
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import HeatLayer from './HeatLayer'
 
 // Fix leaflet default icon path broken by bundlers
@@ -18,35 +18,71 @@ const URGENCY_COLORS = {
   LOW: '#22c55e',
 }
 
-function urgencyIcon(urgency) {
+function urgencyIcon(urgency, isFocus = false) {
   const color = URGENCY_COLORS[urgency] ?? '#94a3b8'
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
-    <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="${color}"/>
+  const ring = isFocus
+    ? `<circle cx="12" cy="12" r="11" fill="none" stroke="${color}" stroke-width="2" opacity="0.5">
+         <animate attributeName="r" from="6" to="14" dur="1.4s" repeatCount="indefinite" />
+         <animate attributeName="opacity" from="0.7" to="0" dur="1.4s" repeatCount="indefinite" />
+       </circle>`
+    : ''
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="${isFocus ? 32 : 24}" height="${isFocus ? 48 : 36}">
+    ${ring}
+    <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="${color}" stroke="white" stroke-width="1"/>
     <circle cx="12" cy="12" r="5" fill="white"/>
   </svg>`
   return L.divIcon({
     html: svg,
     className: '',
-    iconSize: [24, 36],
-    iconAnchor: [12, 36],
-    popupAnchor: [0, -36],
+    iconSize: isFocus ? [32, 48] : [24, 36],
+    iconAnchor: isFocus ? [16, 48] : [12, 36],
+    popupAnchor: [0, isFocus ? -48 : -36],
   })
 }
 
 const userDotIcon = L.divIcon({
-  html: `<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 0 0 2px rgba(59,130,246,0.5);"></div>`,
+  html: `<div style="position:relative;width:18px;height:18px;">
+    <div style="position:absolute;inset:-6px;border-radius:50%;background:rgba(59,130,246,0.35);animation:user-halo 1.8s ease-out infinite;"></div>
+    <div style="position:absolute;inset:0;width:18px;height:18px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 0 0 2px rgba(59,130,246,0.5);"></div>
+  </div>
+  <style>@keyframes user-halo{0%{transform:scale(0.5);opacity:0.7}100%{transform:scale(2.2);opacity:0}}</style>`,
   className: '',
-  iconSize: [16, 16],
-  iconAnchor: [8, 8],
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
 })
+
+function destinationIcon() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 44" width="32" height="44">
+    <defs>
+      <radialGradient id="dg" cx="50%" cy="40%" r="50%">
+        <stop offset="0%" stop-color="#fb923c" />
+        <stop offset="100%" stop-color="#c2410c" />
+      </radialGradient>
+    </defs>
+    <circle cx="16" cy="14" r="13" fill="none" stroke="#fb923c" stroke-width="2" opacity="0.6">
+      <animate attributeName="r" from="6" to="18" dur="1.6s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0.8" to="0" dur="1.6s" repeatCount="indefinite" />
+    </circle>
+    <path d="M16 0C8.27 0 2 6.27 2 14c0 10 14 30 14 30s14-20 14-30C30 6.27 23.73 0 16 0z" fill="url(#dg)" stroke="white" stroke-width="1.5"/>
+    <circle cx="16" cy="14" r="6" fill="white"/>
+    <text x="16" y="18" font-family="system-ui" font-size="10" font-weight="bold" text-anchor="middle" fill="#c2410c">★</text>
+  </svg>`
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [32, 44],
+    iconAnchor: [16, 44],
+    popupAnchor: [0, -44],
+  })
+}
 
 // Keeps the map centered on the user as their coords update. Only re-centers
 // when the coords actually change so it doesn't fight user pan/zoom.
-function FollowUser({ center }) {
+function FollowUser({ center, suspended }) {
   const map = useMap()
   const prevRef = useRef(null)
   useEffect(() => {
-    if (!center) return
+    if (!center || suspended) return
     const prev = prevRef.current
     if (!prev) {
       map.setView(center, 14)
@@ -59,12 +95,27 @@ function FollowUser({ center }) {
       if (movedMeters > 10) map.panTo(center, { animate: true })
     }
     prevRef.current = center
-  }, [center, map])
+  }, [center, map, suspended])
+  return null
+}
+
+// When a destination is set, fit both user + dest into view once.
+function FitToRoute({ from, to }) {
+  const map = useMap()
+  const fitRef = useRef(null)
+  useEffect(() => {
+    if (!from || !to) return
+    const key = `${from[0].toFixed(4)}|${from[1].toFixed(4)}|${to[0].toFixed(4)}|${to[1].toFixed(4)}`
+    if (fitRef.current === key) return
+    fitRef.current = key
+    const bounds = L.latLngBounds([from, to]).pad(0.25)
+    map.fitBounds(bounds, { animate: true, duration: 0.6 })
+  }, [from, to, map])
   return null
 }
 
 // Invalidates size when parent resizes (handles mobile orientation change + panel collapse)
-function ResizeObserver() {
+function ResizeWatcher() {
   const map = useMap()
   useEffect(() => {
     const onResize = () => map.invalidateSize()
@@ -83,12 +134,15 @@ function ResizeObserver() {
 
 function Legend() {
   return (
-    <div className="absolute bottom-3 right-3 z-[400] bg-gray-900/95 border border-gray-800 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-300 space-y-0.5 shadow-lg max-w-[140px]">
-      <div className="font-semibold text-gray-100 mb-0.5">Urgency</div>
+    <div className="absolute bottom-3 right-3 z-[400] bg-gray-900/90 backdrop-blur border border-gray-800 rounded-xl px-3 py-2 text-[11px] text-gray-300 space-y-1 shadow-xl shadow-black/40 max-w-[160px] reveal-up">
+      <div className="font-semibold text-gray-100 mb-1 flex items-center gap-1">
+        <span className="inline-block w-1 h-3 bg-gradient-to-b from-orange-400 to-red-500 rounded-full" />
+        Urgency
+      </div>
       {Object.entries(URGENCY_COLORS).map(([level, color]) => (
         <div key={level} className="flex items-center gap-1.5">
           <span
-            className="inline-block w-2.5 h-2.5 rounded-full"
+            className="inline-block w-2.5 h-2.5 rounded-full ring-1 ring-white/20"
             style={{ background: color }}
           />
           <span>{level}</span>
@@ -98,7 +152,135 @@ function Legend() {
   )
 }
 
-export default function MapView({ alerts, center, accuracy, heatPoints, showHeat = false }) {
+function fmtDistance(km) {
+  if (km < 1) return `${Math.round(km * 1000)} m`
+  return `${km.toFixed(km < 10 ? 1 : 0)} km`
+}
+
+function fmtDuration(min) {
+  if (min < 1) return '<1 min'
+  if (min < 60) return `${Math.round(min)} min`
+  const h = Math.floor(min / 60)
+  const m = Math.round(min - h * 60)
+  return m === 0 ? `${h} h` : `${h} h ${m} min`
+}
+
+function RoutePanel({ route, loading, error, onClear, destination }) {
+  return (
+    <div className="absolute top-3 left-3 z-[400] bg-gradient-to-b from-gray-900/95 to-gray-900/85 backdrop-blur border border-gray-800 rounded-xl px-3 py-2.5 text-xs text-gray-200 shadow-2xl shadow-black/50 max-w-[240px] reveal-up">
+      <div className="flex items-center gap-2 mb-1">
+        <span aria-hidden className="text-base">🧭</span>
+        <span className="font-semibold text-white">Route</span>
+        <button
+          onClick={onClear}
+          className="ml-auto text-gray-400 hover:text-white transition-colors leading-none -mt-px"
+          title="Clear destination"
+          aria-label="Clear destination"
+        >
+          ×
+        </button>
+      </div>
+      {loading && (
+        <div className="flex items-center gap-2 text-gray-400">
+          <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+            <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+          </svg>
+          Calculating directions…
+        </div>
+      )}
+      {!loading && error && (
+        <div className="text-amber-300">
+          {error}
+          {destination && (
+            <div className="mt-1 text-[10px] text-gray-500 tabular-nums">
+              dest: {destination[0].toFixed(4)}, {destination[1].toFixed(4)}
+            </div>
+          )}
+        </div>
+      )}
+      {!loading && !error && route && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-gray-500 uppercase tracking-wider text-[10px]">Distance</span>
+            <span className="text-orange-300 font-semibold tabular-nums">{fmtDistance(route.distanceKm)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-gray-500 uppercase tracking-wider text-[10px]">Drive time</span>
+            <span className="text-emerald-300 font-semibold tabular-nums">{fmtDuration(route.durationMin)}</span>
+          </div>
+          <div className="text-[10px] text-gray-500 mt-1">via OSRM driving network</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Fetches a driving route between user + destination from OSRM's free demo
+// server. Returns { coords: [[lat,lng]…], distanceKm, durationMin } or null
+// on failure (no API key, but rate-limited; treat as best-effort).
+function useOsrmRoute(from, to) {
+  const [route, setRoute] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!from || !to) {
+      setRoute(null)
+      setError('')
+      return undefined
+    }
+    let cancelled = false
+    const controller = new AbortController()
+    setLoading(true)
+    setError('')
+    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`
+    fetch(url, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error('Routing service unavailable')
+        return r.json()
+      })
+      .then((data) => {
+        if (cancelled) return
+        const r = data?.routes?.[0]
+        if (!r?.geometry?.coordinates?.length) {
+          setError('No driving route found.')
+          setRoute(null)
+          return
+        }
+        setRoute({
+          coords: r.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+          distanceKm: r.distance / 1000,
+          durationMin: r.duration / 60,
+        })
+      })
+      .catch((err) => {
+        if (cancelled || err.name === 'AbortError') return
+        setError('Could not load driving route.')
+        setRoute(null)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [from?.[0], from?.[1], to?.[0], to?.[1]])
+
+  return { route, loading, error }
+}
+
+export default function MapView({
+  alerts,
+  center,
+  accuracy,
+  heatPoints,
+  showHeat = false,
+  destination,
+  focusId,
+  onClearDestination,
+}) {
   const defaultCenter = center ?? [30.7333, 76.7794]
 
   // Cap the accuracy circle to something sensible so a 5 km fix doesn't swamp
@@ -107,6 +289,15 @@ export default function MapView({ alerts, center, accuracy, heatPoints, showHeat
     if (!accuracy || !center) return null
     return Math.min(accuracy, 2000)
   }, [accuracy, center])
+
+  const { route, loading: routeLoading, error: routeError } = useOsrmRoute(
+    destination ? center : null,
+    destination
+  )
+
+  // When a destination is set, suspend follow-user pan so the user can see
+  // the full route without it constantly recentering.
+  const followSuspended = !!destination
 
   return (
     <div className="relative w-full h-full">
@@ -120,9 +311,53 @@ export default function MapView({ alerts, center, accuracy, heatPoints, showHeat
           attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <ResizeObserver />
+        <ResizeWatcher />
         {showHeat && heatPoints?.length > 0 && <HeatLayer points={heatPoints} />}
-        {center && <FollowUser center={center} />}
+        {center && <FollowUser center={center} suspended={followSuspended} />}
+        {destination && center && <FitToRoute from={center} to={destination} />}
+
+        {/* Route polyline — render a darker casing under a brighter line so
+         * it stands out against any tile colour. */}
+        {route?.coords?.length > 0 && (
+          <>
+            <Polyline
+              positions={route.coords}
+              pathOptions={{
+                color: '#0b0f19',
+                weight: 8,
+                opacity: 0.8,
+                lineCap: 'round',
+                lineJoin: 'round',
+              }}
+            />
+            <Polyline
+              positions={route.coords}
+              pathOptions={{
+                color: '#fb923c',
+                weight: 5,
+                opacity: 0.95,
+                lineCap: 'round',
+                lineJoin: 'round',
+              }}
+            />
+          </>
+        )}
+
+        {/* Fallback dashed great-circle line if routing failed but we have
+         * both endpoints — at least the user sees direction + distance. */}
+        {!route && destination && center && (
+          <Polyline
+            positions={[center, destination]}
+            pathOptions={{
+              color: '#fb923c',
+              weight: 3,
+              opacity: 0.7,
+              dashArray: '6 8',
+              lineCap: 'round',
+            }}
+          />
+        )}
+
         {center && (
           <>
             <Marker position={center} icon={userDotIcon}>
@@ -144,10 +379,30 @@ export default function MapView({ alerts, center, accuracy, heatPoints, showHeat
             )}
           </>
         )}
+
+        {destination && (
+          <Marker position={destination} icon={destinationIcon()}>
+            <Popup>
+              <div className="text-xs">
+                <strong>Destination</strong>
+                <br />
+                {destination[0].toFixed(5)}, {destination[1].toFixed(5)}
+                {route && (
+                  <>
+                    <br />
+                    {fmtDistance(route.distanceKm)} · {fmtDuration(route.durationMin)} drive
+                  </>
+                )}
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
         {alerts.map((alert) => {
           const [lng, lat] = alert.location.coordinates
+          const isFocus = focusId && alert.id === focusId
           return (
-            <Marker key={alert.id} position={[lat, lng]} icon={urgencyIcon(alert.urgency)}>
+            <Marker key={alert.id} position={[lat, lng]} icon={urgencyIcon(alert.urgency, isFocus)}>
               <Popup>
                 <div className="text-sm max-w-[240px]">
                   <p className="font-bold capitalize">{alert.category}</p>
@@ -169,6 +424,15 @@ export default function MapView({ alerts, center, accuracy, heatPoints, showHeat
           )
         })}
       </MapContainer>
+      {destination && (
+        <RoutePanel
+          route={route}
+          loading={routeLoading}
+          error={routeError}
+          destination={destination}
+          onClear={onClearDestination}
+        />
+      )}
       <Legend />
     </div>
   )

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../utils/api'
 import { apiError } from '../utils/error'
 import { useAuth } from '../context/AuthContext'
@@ -430,7 +431,7 @@ export default function AlertCard({ alert, onUpdate }) {
   const witnesses = alert.witnesses ?? 1
   const isOwn = user?.id && alert.reporter_id === user.id
   const [lng, lat] = alert.location?.coordinates ?? [0, 0]
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`
+  const mapsUrl = `/map?dest=${lat},${lng}&focus=${alert.id}`
 
   const canSetEta =
     user?.role === 'volunteer' &&
@@ -608,15 +609,13 @@ export default function AlertCard({ alert, onUpdate }) {
             </button>
           )}
           <ShareAlert alert={alert} />
-          <a
-            href={mapsUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded-lg transition-colors"
-            title="Open directions in Google Maps"
+          <Link
+            to={mapsUrl}
+            className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded-lg transition-colors hover:bg-gray-800/60"
+            title="Open in NeighbourAid map"
           >
-            {t('card_directions')}
-          </a>
+            🧭 {t('card_directions')}
+          </Link>
           {user && !isOwn && !flagged && (
             <button
               onClick={flag}

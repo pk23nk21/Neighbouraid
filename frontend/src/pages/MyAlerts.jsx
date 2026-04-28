@@ -8,16 +8,22 @@ import EmptyState from '../components/EmptyState'
 import ResponderTracker from '../components/ResponderTracker'
 
 const URGENCY_BADGE = {
-  CRITICAL: 'bg-red-600 text-white',
-  HIGH: 'bg-orange-500 text-white',
-  MEDIUM: 'bg-yellow-500 text-black',
-  LOW: 'bg-green-600 text-white',
+  CRITICAL: 'bg-gradient-to-b from-red-500 to-red-600 text-white shadow-sm shadow-red-500/40',
+  HIGH: 'bg-gradient-to-b from-orange-400 to-orange-500 text-white shadow-sm shadow-orange-500/40',
+  MEDIUM: 'bg-gradient-to-b from-yellow-400 to-yellow-500 text-black shadow-sm shadow-yellow-500/40',
+  LOW: 'bg-gradient-to-b from-green-500 to-green-600 text-white shadow-sm shadow-green-500/30',
 }
 
 const STATUS_BADGE = {
-  open: 'bg-blue-900 text-blue-300',
-  accepted: 'bg-purple-900 text-purple-300',
-  resolved: 'bg-gray-800 text-gray-400',
+  open: 'bg-blue-900/60 text-blue-300 border-blue-800/60',
+  accepted: 'bg-purple-900/60 text-purple-300 border-purple-800/60',
+  resolved: 'bg-gray-800/80 text-gray-400 border-gray-700/60',
+}
+
+const STATUS_DOT = {
+  open: 'bg-blue-400 animate-pulse',
+  accepted: 'bg-purple-400 animate-pulse',
+  resolved: 'bg-gray-500',
 }
 
 function useTimeAgo(iso) {
@@ -36,22 +42,26 @@ function useTimeAgo(iso) {
   return `${Math.floor(diff / 86400)}${t('t_day')}`
 }
 
-function AlertRow({ a, onCancel, cancelling }) {
+function AlertRow({ a, onCancel, cancelling, index = 0 }) {
   const { t } = useI18n()
   const ago = useTimeAgo(a.created_at)
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-3 sm:p-4">
+    <div
+      className="bg-gradient-to-br from-gray-900 to-gray-900/60 border border-gray-800 rounded-xl p-3 sm:p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-700 hover:shadow-lg hover:shadow-black/40 reveal-up"
+      style={{ animationDelay: `${index * 60}ms` }}
+    >
       <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-semibold capitalize text-white">{t(`cat_${a.category}`) ?? a.category}</span>
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${URGENCY_BADGE[a.urgency]}`}>
             {a.urgency}
           </span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_BADGE[a.status]}`}>
+          <span className={`text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 capitalize border ${STATUS_BADGE[a.status]}`}>
+            <span className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_DOT[a.status]}`} />
             {a.status}
           </span>
         </div>
-        <span className="text-xs text-gray-500 shrink-0">{ago}</span>
+        <span className="text-xs text-gray-500 shrink-0 tabular-nums">{ago}</span>
       </div>
       <p className="text-gray-300 text-sm break-words">{a.description}</p>
       {a.address && (
@@ -61,7 +71,7 @@ function AlertRow({ a, onCancel, cancelling }) {
         </p>
       )}
       <div className="flex flex-wrap gap-2 sm:gap-3 mt-2 text-[11px] text-gray-500">
-        <span>Verified {a.verified_score ?? 0}/100</span>
+        <span className="tabular-nums">Verified {a.verified_score ?? 0}/100</span>
         <span>
           👥 {a.witnesses ?? 1}{' '}
           {(a.witnesses ?? 1) !== 1 ? t('card_witness_many') : t('card_witness_one')}
@@ -76,7 +86,7 @@ function AlertRow({ a, onCancel, cancelling }) {
           <button
             onClick={() => onCancel(a.id)}
             disabled={cancelling}
-            className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
+            className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50 transition-colors"
           >
             {cancelling ? t('mine_cancelling') : t('mine_cancel')}
           </button>
@@ -131,24 +141,25 @@ export default function MyAlerts() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
-      <div className="flex items-center justify-between mb-5 sm:mb-6 gap-3">
+      <div className="flex items-center justify-between mb-5 sm:mb-6 gap-3 reveal-up">
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold text-white">{t('mine_title')}</h1>
-          <p className="text-gray-400 text-xs sm:text-sm mt-1">
+          <p className="text-gray-400 text-xs sm:text-sm mt-1 tabular-nums">
             {alerts.length} {t('mine_summary')} · {groups.open.length} {t('mine_open')} · {groups.accepted.length} {t('mine_in_progress')}
           </p>
         </div>
         <Link
           to="/post-alert"
-          className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-3 sm:px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+          className="bg-gradient-to-b from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-white text-sm font-semibold px-3 sm:px-4 py-2 rounded-lg shadow-md shadow-red-500/20 hover:shadow-red-500/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] whitespace-nowrap"
         >
-          {t('mine_new')}
+          + {t('mine_new')}
         </Link>
       </div>
 
       {error && (
-        <div className="bg-red-950 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3 mb-6">
-          {error}
+        <div className="bg-red-950/70 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 flex items-start gap-2 pop-in">
+          <span aria-hidden className="text-base shrink-0 mt-px">⚠️</span>
+          <span>{error}</span>
         </div>
       )}
 
@@ -161,7 +172,7 @@ export default function MyAlerts() {
           action={
             <Link
               to="/post-alert"
-              className="inline-block bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+              className="inline-block bg-gradient-to-b from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-md shadow-red-500/20 hover:shadow-red-500/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
             >
               {t('mine_post_first')}
             </Link>
@@ -169,12 +180,13 @@ export default function MyAlerts() {
         />
       ) : (
         <div className="space-y-3">
-          {alerts.map((a) => (
+          {alerts.map((a, i) => (
             <AlertRow
               key={a.id}
               a={a}
               onCancel={cancel}
               cancelling={cancelling === a.id}
+              index={i}
             />
           ))}
         </div>
