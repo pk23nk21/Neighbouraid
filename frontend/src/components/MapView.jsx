@@ -165,6 +165,30 @@ function fmtDuration(min) {
   return m === 0 ? `${h} h` : `${h} h ${m} min`
 }
 
+function prettifyStep(step) {
+  if (!step) return 'Continue'
+  let out = step
+    .replace(/\bhead\b/gi, 'Head')
+    .replace(/\barrive\b/gi, 'Arrive')
+    .replace(/\buturn\b/gi, 'U-turn')
+    .replace(/\bslight right\b/gi, 'Slight right')
+    .replace(/\bslight left\b/gi, 'Slight left')
+    .replace(/\bsharp right\b/gi, 'Sharp right')
+    .replace(/\bsharp left\b/gi, 'Sharp left')
+  out = out.charAt(0).toUpperCase() + out.slice(1)
+  return out
+}
+
+function stepIcon(step) {
+  const s = (step || '').toLowerCase()
+  if (s.includes('left')) return '↰'
+  if (s.includes('right')) return '↱'
+  if (s.includes('u-turn')) return '⤴'
+  if (s.includes('arrive')) return '★'
+  if (s.includes('continue') || s.includes('head')) return '↑'
+  return '•'
+}
+
 function RoutePanel({ route, loading, error, onClear, destination }) {
   return (
     <div className="absolute top-3 left-3 z-[400] bg-gradient-to-b from-gray-900/95 to-gray-900/85 backdrop-blur border border-gray-800 rounded-xl px-3 py-2.5 text-xs text-gray-200 shadow-2xl shadow-black/50 max-w-[240px] reveal-up">
@@ -238,7 +262,7 @@ function useOsrmRoute(from, to) {
     const controller = new AbortController()
     setLoading(true)
     setError('')
-    const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`
+    const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson&steps=true`
     fetch(url, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error('Routing service unavailable')
@@ -256,6 +280,18 @@ function useOsrmRoute(from, to) {
           coords: r.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
           distanceKm: r.distance / 1000,
           durationMin: r.duration / 60,
+          steps: (r.legs || [])
+            .flatMap((leg) => leg.steps || [])
+            .map((step) => ({
+              instruction:
+                step.maneuver?.instruction ||
+                [step.maneuver?.modifier, step.name].filter(Boolean).join(' ') ||
+                'Continue',
+              distanceKm: (step.distance || 0) / 1000,
+              durationMin: (step.duration || 0) / 60,
+            }))
+            .filter((step) => step.distanceKm > 0.02)
+            .slice(0, 6),
         })
       })
       .catch((err) => {
@@ -273,6 +309,84 @@ function useOsrmRoute(from, to) {
   }, [from, fromLat, fromLng, to, toLat, toLng])
 
   return { route, loading, error }
+}
+
+function RichRoutePanel({ route, loading, error, onClear, destination }) {
+  return (
+    <div className="absolute top-3 left-3 z-[410] bg-gradient-to-b from-gray-900/95 to-gray-900/85 backdrop-blur border border-gray-800 rounded-xl px-3 py-2.5 text-xs text-gray-200 shadow-2xl shadow-black/50 max-w-[280px] reveal-up">
+      <div className="flex items-center gap-2 mb-1">
+        <span aria-hidden className="text-base">🧭</span>
+        <span className="font-semibold text-white">Live directions</span>
+        <button
+          onClick={onClear}
+          className="ml-auto text-gray-400 hover:text-white transition-colors leading-none -mt-px"
+          title="Clear destination"
+          aria-label="Clear destination"
+        >
+          ×
+        </button>
+      </div>
+      {loading && (
+        <div className="flex items-center gap-2 text-gray-400">
+          <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+            <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+          </svg>
+          Calculating directions...
+        </div>
+      )}
+      {!loading && error && (
+        <div className="text-amber-300">
+          {error}
+          {destination && (
+            <div className="mt-1 text-[10px] text-gray-500 tabular-nums">
+              dest: {destination[0].toFixed(4)}, {destination[1].toFixed(4)}
+            </div>
+          )}
+        </div>
+      )}
+      {!loading && !error && route && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-gray-500 uppercase tracking-wider text-[10px]">Distance</span>
+            <span className="text-orange-300 font-semibold tabular-nums">{fmtDistance(route.distanceKm)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-gray-500 uppercase tracking-wider text-[10px]">Drive time</span>
+            <span className="text-emerald-300 font-semibold tabular-nums">{fmtDuration(route.durationMin)}</span>
+          </div>
+          {route.steps?.length > 0 && (
+            <div className="pt-1 border-t border-gray-800/80">
+              <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">
+                Next steps
+              </div>
+              <ol className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                {route.steps.map((step, idx) => (
+                  <li key={`${idx}-${step.instruction}`} className="flex items-start gap-2">
+                    <span className="text-orange-300 font-semibold shrink-0 mt-px">
+                      {stepIcon(step.instruction)}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-gray-100 leading-snug">
+                        {prettifyStep(step.instruction)}
+                      </div>
+                      <div className="text-[10px] text-gray-500 tabular-nums">
+                        {fmtDistance(step.distanceKm)}
+                        {typeof step.durationMin === 'number'
+                          ? ` · ${fmtDuration(step.durationMin)}`
+                          : ''}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+          <div className="text-[10px] text-gray-500 mt-1">via OSRM driving network</div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function MapView({
@@ -429,7 +543,7 @@ export default function MapView({
         })}
       </MapContainer>
       {destination && (
-        <RoutePanel
+        <RichRoutePanel
           route={route}
           loading={routeLoading}
           error={routeError}
