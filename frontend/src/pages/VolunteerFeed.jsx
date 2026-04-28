@@ -103,24 +103,43 @@ export default function VolunteerFeed() {
   useEffect(() => {
     if (!coords) return undefined
     let cancelled = false
-    const [lng, lat] = coords
-    setLoading(true)
-    api
-      .get('/api/alerts/nearby', { params: { lat, lng, km: 10 } })
-      .then(({ data }) => {
-        if (!cancelled) {
-          setAlerts(data)
-          knownIds.current = new Set(data.map((a) => a.id))
-        }
-      })
-      .catch((err) => {
+    const loadAlerts = async (background = false) => {
+      const [lng, lat] = coords
+      if (!background) setLoading(true)
+      try {
+        const { data } = await api.get('/api/alerts/nearby', {
+          params: { lat, lng, km: 10 },
+        })
+        if (cancelled) return
+        setAlerts(data)
+        knownIds.current = new Set([
+          ...knownIds.current,
+          ...data.map((a) => a.id),
+        ])
+        setError('')
+      } catch (err) {
         if (!cancelled) setError(apiError(err, t('vol_failed')))
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+      } finally {
+        if (!cancelled && !background) setLoading(false)
+      }
+    }
+
+    void loadAlerts()
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadAlerts(true)
+      }
+    }, 30000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void loadAlerts(true)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       cancelled = true
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [coords, t])
 

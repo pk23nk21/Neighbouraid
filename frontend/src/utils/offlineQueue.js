@@ -2,12 +2,12 @@
  * Offline alert queue backed by IndexedDB.
  *
  * When a reporter hits "Post Alert" while their connection is flaky or
- * fully offline (disaster-mode — tower overloaded or power is out), we
+ * fully offline (disaster-mode - tower overloaded or power is out), we
  * stash the payload in IDB and retry automatically when the browser
  * reports it's back online. The reporter gets immediate optimistic
  * feedback so they don't tap again and duplicate.
  *
- * Kept dependency-free on purpose — a `idb` wrapper would be nicer but
+ * Kept dependency-free on purpose - a `idb` wrapper would be nicer but
  * IDB in 40 lines is fine for one store.
  */
 
@@ -15,7 +15,26 @@ const DB_NAME = 'neighbouraid-offline'
 const DB_VERSION = 1
 const STORE = 'pending-alerts'
 
+export const OFFLINE_QUEUE_EVENT = 'offline-queue:changed'
+
 let dbPromise = null
+let flushPromise = null
+
+function emitQueueEvent(detail) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(OFFLINE_QUEUE_EVENT, { detail }))
+}
+
+async function publishQueueState(detail = {}) {
+  try {
+    const remaining = (await listPending()).length
+    emitQueueEvent({ ...detail, remaining })
+    return remaining
+  } catch {
+    emitQueueEvent(detail)
+    return null
+  }
+}
 
 function openDb() {
   if (dbPromise) return dbPromise
@@ -46,7 +65,10 @@ export async function enqueueAlert(payload) {
       created_at: Date.now(),
       attempts: 0,
     })
-    req.onsuccess = () => resolve(req.result)
+    req.onsuccess = () => {
+      resolve(req.result)
+      void publishQueueState({ type: 'enqueued' })
+    }
     req.onerror = () => reject(req.error)
   })
 }
@@ -64,7 +86,10 @@ export async function removePending(id) {
   const store = await tx('readwrite')
   return new Promise((resolve, reject) => {
     const req = store.delete(id)
-    req.onsuccess = () => resolve()
+    req.onsuccess = () => {
+      resolve()
+      void publishQueueState({ type: 'removed' })
+    }
     req.onerror = () => reject(req.error)
   })
 }
@@ -91,24 +116,43 @@ export async function bumpAttempts(id) {
  * { sent, failed, remaining } counts so the UI can show progress.
  */
 export async function flushQueue(postFn) {
-  const pending = await listPending()
-  let sent = 0
-  let failed = 0
-  for (const row of pending) {
-    try {
-      await postFn(row.payload)
-      await removePending(row.id)
-      sent += 1
-    } catch {
-      await bumpAttempts(row.id)
-      failed += 1
-      // Give up on individual items that have failed many times — prevents
-      // an irrecoverable payload from blocking the whole queue forever.
-      if ((row.attempts ?? 0) >= 10) {
-        await removePending(row.id).catch(() => {})
+  if (flushPromise) return flushPromise
+
+  flushPromise = (async () => {
+    const pending = await listPending()
+    let sent = 0
+    let failed = 0
+
+    for (const row of pending) {
+      try {
+        await postFn(row.payload)
+        await removePending(row.id)
+        sent += 1
+      } catch {
+        await bumpAttempts(row.id)
+        failed += 1
+        // Give up on irrecoverable rows so one bad payload cannot block the
+        // entire queue forever.
+        if ((row.attempts ?? 0) >= 10) {
+          await removePending(row.id).catch(() => {})
+        }
       }
     }
-  }
-  const remaining = await listPending()
-  return { sent, failed, remaining: remaining.length }
+
+    const remaining = await publishQueueState({
+      type: 'flushed',
+      sent,
+      failed,
+    })
+
+    return {
+      sent,
+      failed,
+      remaining: remaining ?? (await listPending()).length,
+    }
+  })().finally(() => {
+    flushPromise = null
+  })
+
+  return flushPromise
 }

@@ -240,6 +240,8 @@ function RoutePanel({ route, loading, error, onClear, destination }) {
   )
 }
 
+void RoutePanel
+
 // Fetches a driving route between user + destination from OSRM's free demo
 // server. Returns { coords: [[lat,lng]…], distanceKm, durationMin } or null
 // on failure (no API key, but rate-limited; treat as best-effort).
@@ -253,7 +255,12 @@ function useOsrmRoute(from, to) {
   const toLng = to?.[1]
 
   useEffect(() => {
-    if (!from || !to) {
+    if (
+      fromLat == null ||
+      fromLng == null ||
+      toLat == null ||
+      toLng == null
+    ) {
       setRoute(null)
       setError('')
       return undefined
@@ -306,7 +313,7 @@ function useOsrmRoute(from, to) {
       cancelled = true
       controller.abort()
     }
-  }, [from, fromLat, fromLng, to, toLat, toLng])
+  }, [fromLat, fromLng, toLat, toLng])
 
   return { route, loading, error }
 }

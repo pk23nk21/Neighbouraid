@@ -6,7 +6,6 @@ Each resource carries a `kind`, location, contact, and an `expires_at`
 deadline so stale entries (closed shelters, depleted oxygen) drop off
 automatically — analogous to how `safety_checkins` work."""
 
-from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 

@@ -140,6 +140,10 @@ export default function Profile() {
   }
 
   const [lng, lat] = me?.location?.coordinates ?? [0, 0]
+  const contactCount = contactsDraft.length
+  const readinessCount =
+    (me?.role === 'volunteer' && skillsDraft.length === 0 ? 1 : 0) +
+    (contactCount === 0 ? 1 : 0)
 
   const sectionCls =
     'bg-gradient-to-br from-gray-900 to-gray-900/60 border border-gray-800 rounded-xl p-4 sm:p-5 shadow-lg shadow-black/20'
@@ -153,7 +157,30 @@ export default function Profile() {
         <p className="text-gray-500 text-sm break-words">
           {t('profile_signed_as')} <span className="text-gray-300">{me?.email}</span>
         </p>
+        <div className="flex flex-wrap gap-2 mt-3 text-xs">
+          <a href="#location" className="px-2.5 py-1 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-orange-500/50 transition-colors">
+            Location
+          </a>
+          {me?.role === 'volunteer' && (
+            <a href="#skills" className="px-2.5 py-1 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-orange-500/50 transition-colors">
+              Skills
+            </a>
+          )}
+          <a href="#contacts" className="px-2.5 py-1 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-orange-500/50 transition-colors">
+            Contacts
+          </a>
+          <a href="#activity" className="px-2.5 py-1 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-orange-500/50 transition-colors">
+            Activity
+          </a>
+        </div>
       </div>
+
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-2 reveal-up stagger-1">
+        <Stat label="Contacts" value={contactCount} accent={contactCount > 0 ? 'text-emerald-400' : 'text-amber-400'} />
+        <Stat label="Skills" value={me?.role === 'volunteer' ? skillsDraft.length : '-'} accent="text-blue-400" />
+        <Stat label="Vehicle" value={me?.role === 'volunteer' ? (vehicleDraft ? 'yes' : 'no') : '-'} accent="text-violet-300" />
+        <Stat label="Open tasks" value={readinessCount} accent={readinessCount === 0 ? 'text-emerald-400' : 'text-orange-400'} />
+      </section>
 
       {error && (
         <div className="bg-red-950/70 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3 flex items-start gap-2 pop-in">
@@ -168,7 +195,7 @@ export default function Profile() {
         </div>
       )}
 
-      <section className={`${sectionCls} reveal-up stagger-1`}>
+      <section id="identity" className={`${sectionCls} reveal-up stagger-1 scroll-mt-24`}>
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-3">
           {t('profile_identity')}
         </h2>
@@ -184,7 +211,7 @@ export default function Profile() {
         </dl>
       </section>
 
-      <section className={`${sectionCls} reveal-up stagger-2`}>
+      <section id="location" className={`${sectionCls} reveal-up stagger-2 scroll-mt-24`}>
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest">
             {t('profile_home_location')}
@@ -213,7 +240,7 @@ export default function Profile() {
       </section>
 
       {me?.role === 'volunteer' && (
-        <section className={`${sectionCls} reveal-up stagger-3`}>
+        <section id="skills" className={`${sectionCls} reveal-up stagger-3 scroll-mt-24`}>
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-3">
             Skills &amp; availability
           </h2>
@@ -243,7 +270,7 @@ export default function Profile() {
         </section>
       )}
 
-      <section className={`${sectionCls} reveal-up stagger-4`}>
+      <section id="contacts" className={`${sectionCls} reveal-up stagger-4 scroll-mt-24`}>
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-1">
           Emergency contacts
         </h2>
@@ -264,7 +291,7 @@ export default function Profile() {
         </button>
       </section>
 
-      <section className={`${sectionCls} reveal-up stagger-5`}>
+      <section id="activity" className={`${sectionCls} reveal-up stagger-5 scroll-mt-24`}>
         <div className="flex items-center justify-between mb-3 gap-2">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest">
             {t('profile_activity')}

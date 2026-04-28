@@ -130,6 +130,9 @@ export default function Navbar() {
         </Link>
 
         <div className="hidden md:flex items-center gap-5 text-sm">
+          <NavLink to="/" className={navLink}>
+            Home
+          </NavLink>
           <NavLink to="/map" className={navLink}>
             {t('nav_map')}
           </NavLink>
@@ -228,6 +231,7 @@ export default function Navbar() {
       >
         <div className="px-4 py-3 space-y-1 text-sm glass">
           {[
+            { to: '/', label: 'Home' },
             { to: '/map', label: t('nav_map') },
             { to: '/safety', label: t('nav_safety') },
             { to: '/resources', label: t('nav_resources') },

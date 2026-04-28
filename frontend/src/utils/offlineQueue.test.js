@@ -75,4 +75,28 @@ describe('offlineQueue', () => {
     await flushQueue(post)
     expect(await listPending()).toHaveLength(0)
   })
+
+  it('flushQueue reuses the in-flight flush so concurrent callers do not double-post', async () => {
+    await enqueueAlert({ description: 'one' })
+
+    let release
+    const gate = new Promise((resolve) => {
+      release = resolve
+    })
+    const post = vi.fn(async () => {
+      await gate
+      return { ok: true }
+    })
+
+    const first = flushQueue(post)
+    const second = flushQueue(post)
+
+    release()
+    const [a, b] = await Promise.all([first, second])
+
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(a).toStrictEqual(b)
+    expect(a.sent).toBe(1)
+    expect(await listPending()).toHaveLength(0)
+  })
 })

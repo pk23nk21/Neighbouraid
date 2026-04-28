@@ -5,7 +5,11 @@ import { apiError } from '../utils/error'
 import { useVoice } from '../hooks/useVoice'
 import { useI18n } from '../utils/i18n'
 import { approxKb, compressImage } from '../utils/photo'
-import { enqueueAlert, flushQueue, listPending } from '../utils/offlineQueue'
+import {
+  OFFLINE_QUEUE_EVENT,
+  enqueueAlert,
+  listPending,
+} from '../utils/offlineQueue'
 import { useToast } from '../components/Toast'
 
 const CATEGORIES = ['medical', 'flood', 'fire', 'missing', 'power', 'other']
@@ -46,35 +50,41 @@ export default function PostAlert() {
   })
 
   useEffect(() => {
-    listPending().then((rows) => setPendingCount(rows.length)).catch(() => {})
+    const refreshPending = () => {
+      listPending().then((rows) => setPendingCount(rows.length)).catch(() => {})
+    }
+
+    refreshPending()
     const onOnline = () => {
       setOnline(true)
-      // Try to flush any queued alerts as soon as we're back online
-      flushQueue((payload) => api.post('/api/alerts/', payload))
-        .then(({ sent, remaining }) => {
-          setPendingCount(remaining)
-          if (sent > 0) {
-            toast({
-              variant: 'success',
-              title: 'Queued alerts sent',
-              body: `${sent} alert${sent !== 1 ? 's' : ''} delivered after reconnect.`,
-            })
-          }
-        })
-        .catch(() => {})
+      refreshPending()
     }
     const onOffline = () => setOnline(false)
+    const onQueueChange = (event) => {
+      const remaining = event?.detail?.remaining
+      if (typeof remaining === 'number') {
+        setPendingCount(remaining)
+        return
+      }
+      refreshPending()
+    }
     window.addEventListener('online', onOnline)
     window.addEventListener('offline', onOffline)
+    window.addEventListener(OFFLINE_QUEUE_EVENT, onQueueChange)
     return () => {
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
+      window.removeEventListener(OFFLINE_QUEUE_EVENT, onQueueChange)
     }
-  }, [toast])
+  }, [])
 
   const detectLocation = () => {
-    if (!navigator.geolocation) return
+    if (!navigator.geolocation) {
+      setError('Geolocation is not available in this browser.')
+      return
+    }
     setLocLoading(true)
+    setError('')
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         setForm((f) => ({
@@ -84,7 +94,10 @@ export default function PostAlert() {
         setLocationSet(true)
         setLocLoading(false)
       },
-      () => setLocLoading(false),
+      (err) => {
+        setLocLoading(false)
+        setError(err.message || 'Could not read your location.')
+      },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     )
   }

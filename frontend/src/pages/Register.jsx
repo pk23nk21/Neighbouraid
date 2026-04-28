@@ -24,8 +24,12 @@ export default function Register() {
   const [locLoading, setLocLoading] = useState(false)
 
   const detectLocation = () => {
-    if (!navigator.geolocation) return
+    if (!navigator.geolocation) {
+      setError('Geolocation is not available in this browser.')
+      return
+    }
     setLocLoading(true)
+    setError('')
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         setForm((f) => ({
@@ -34,7 +38,10 @@ export default function Register() {
         }))
         setLocLoading(false)
       },
-      () => setLocLoading(false),
+      (err) => {
+        setLocLoading(false)
+        setError(err.message || 'Could not detect your location.')
+      },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     )
   }

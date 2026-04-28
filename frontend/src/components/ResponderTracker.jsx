@@ -47,7 +47,10 @@ export default function ResponderTracker({ alert }) {
       if (document.visibilityState !== 'visible') return
       try {
         const { data } = await api.get(`/api/alerts/${alert.id}/responder`)
-        if (!cancelled) setResponder(data)
+        if (!cancelled) {
+          setResponder(data)
+          setError('')
+        }
       } catch (err) {
         if (!cancelled)
           setError(err?.response?.data?.detail || 'Could not load responder position')
@@ -55,9 +58,16 @@ export default function ResponderTracker({ alert }) {
     }
     tick()
     id = setInterval(tick, 8000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void tick()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       cancelled = true
       if (id) clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [alert.id])
 

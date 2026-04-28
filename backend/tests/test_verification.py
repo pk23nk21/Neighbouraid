@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from bson import ObjectId
 from app.core.security import create_token
 from app.services.verification import compute_verified_score

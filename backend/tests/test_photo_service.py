@@ -15,7 +15,7 @@ import pytest
 PIL = pytest.importorskip("PIL")
 from PIL import Image  # noqa: E402
 
-from app.services.photo import analyze_photos
+from app.services.photo import analyze_photos  # noqa: E402
 
 
 def _image_data_url(width: int, height: int, color: tuple = (200, 30, 30)) -> str:
