@@ -437,6 +437,7 @@ export default function AlertCard({ alert, onUpdate }) {
     user?.role === 'volunteer' &&
     alert.status === 'accepted' &&
     alert.accepted_by === user.id
+  const isAcceptedByMe = user?.role === 'volunteer' && alert.accepted_by === user?.id
 
   const isSkillMatch = alert.is_skill_match === true
   const photoCount = alert.photo_count ?? (alert.photos?.length ?? 0)
@@ -645,7 +646,7 @@ export default function AlertCard({ alert, onUpdate }) {
               {t('card_accept')}
             </button>
           )}
-          {user?.role === 'volunteer' && alert.status === 'accepted' && (
+          {isAcceptedByMe && alert.status === 'accepted' && (
             <button
               onClick={resolve}
               disabled={loading === 'resolve'}

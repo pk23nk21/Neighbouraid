@@ -50,7 +50,7 @@ const CATEGORY_ICON = {
 }
 
 export default function VolunteerFeed() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const { push: toast } = useToast()
   const notif = useNotifications()
   const voiceAlert = useVoiceAlert()
@@ -200,7 +200,9 @@ export default function VolunteerFeed() {
   }
 
   const openAlerts = alerts.filter((a) => a.status === 'open')
-  const acceptedAlerts = alerts.filter((a) => a.status === 'accepted')
+  const acceptedAlerts = alerts.filter(
+    (a) => a.status === 'accepted' && a.accepted_by === user?.id
+  )
   const connected = status === 'open'
 
   return (
