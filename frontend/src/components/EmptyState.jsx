@@ -14,14 +14,21 @@ export default function EmptyState({
   return (
     <div
       role="status"
-      className={`bg-gray-900 border border-gray-800 rounded-xl p-8 text-center ${className}`}
+      className={`relative bg-gradient-to-b from-gray-900/80 to-gray-900/40 border border-gray-800 rounded-2xl p-8 sm:p-10 text-center reveal-up overflow-hidden ${className}`}
     >
-      <div className="text-4xl mb-3" aria-hidden>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 -top-10 mx-auto h-32 w-48 rounded-full bg-orange-500/10 blur-3xl"
+      />
+      <div
+        className="relative mx-auto mb-3 inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-800/80 border border-gray-700/60 text-3xl shadow-inner shadow-black/40"
+        aria-hidden
+      >
         {icon}
       </div>
-      {title && <h3 className="text-base font-semibold text-gray-100 mb-1">{title}</h3>}
-      {body && <p className="text-sm text-gray-500 mb-4 leading-relaxed">{body}</p>}
-      {action}
+      {title && <h3 className="relative text-base font-semibold text-gray-100 mb-1">{title}</h3>}
+      {body && <p className="relative text-sm text-gray-500 mb-5 leading-relaxed max-w-sm mx-auto">{body}</p>}
+      {action && <div className="relative">{action}</div>}
     </div>
   )
 }

@@ -9,18 +9,23 @@ export function ToastProvider({ children }) {
   const timers = useRef(new Map())
 
   const dismiss = useCallback((id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
+    setToasts((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, leaving: true } : t))
+    )
     const h = timers.current.get(id)
     if (h) {
       clearTimeout(h)
       timers.current.delete(id)
     }
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id))
+    }, 220)
   }, [])
 
   const push = useCallback(
     ({ title, body, variant = 'info', ttl = 6000 }) => {
       const id = nextId++
-      setToasts((prev) => [...prev, { id, title, body, variant }])
+      setToasts((prev) => [...prev, { id, title, body, variant, ttl, leaving: false }])
       if (ttl > 0) {
         timers.current.set(
           id,
@@ -37,7 +42,7 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ push, dismiss }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[1000] flex flex-col gap-2 w-[320px] max-w-[calc(100vw-2rem)]">
+      <div className="fixed bottom-4 right-4 z-[1000] flex flex-col gap-2 w-[340px] max-w-[calc(100vw-2rem)]">
         {toasts.map((t) => (
           <ToastItem key={t.id} toast={t} onClose={() => dismiss(t.id)} />
         ))}
@@ -47,10 +52,10 @@ export function ToastProvider({ children }) {
 }
 
 const VARIANT_STYLE = {
-  info: 'border-gray-700 bg-gray-900/95',
-  success: 'border-emerald-700 bg-emerald-950/70',
-  warning: 'border-amber-600 bg-amber-950/70',
-  danger: 'border-red-600 bg-red-950/70',
+  info: 'border-gray-700 bg-gray-900/90',
+  success: 'border-emerald-700 bg-emerald-950/80',
+  warning: 'border-amber-600 bg-amber-950/80',
+  danger: 'border-red-600 bg-red-950/80',
 }
 
 const VARIANT_ICON = {
@@ -67,13 +72,25 @@ const VARIANT_BAR = {
   danger: 'bg-red-400',
 }
 
+const VARIANT_GLOW = {
+  info: 'shadow-blue-500/10',
+  success: 'shadow-emerald-500/15',
+  warning: 'shadow-amber-500/15',
+  danger: 'shadow-red-500/20',
+}
+
 function ToastItem({ toast, onClose }) {
   return (
     <div
       role="status"
-      className={`relative border rounded-xl px-4 py-3 pl-5 text-sm text-gray-100 shadow-2xl backdrop-blur pop-in overflow-hidden ${
-        VARIANT_STYLE[toast.variant] ?? VARIANT_STYLE.info
+      className={`relative border rounded-xl px-4 py-3 pl-5 text-sm text-gray-100 shadow-2xl backdrop-blur-md overflow-hidden ${
+        toast.leaving ? 'animate-toast-out' : 'slide-in-right'
+      } ${VARIANT_STYLE[toast.variant] ?? VARIANT_STYLE.info} ${
+        VARIANT_GLOW[toast.variant] ?? VARIANT_GLOW.info
       }`}
+      style={{
+        animationFillMode: 'both',
+      }}
     >
       {/* Coloured side bar for fast variant identification at a glance */}
       <span
@@ -96,12 +113,24 @@ function ToastItem({ toast, onClose }) {
         </div>
         <button
           onClick={onClose}
-          className="text-gray-500 hover:text-gray-200 text-lg leading-none shrink-0 -mt-0.5"
+          className="text-gray-500 hover:text-gray-200 text-lg leading-none shrink-0 -mt-0.5 transition-colors"
           aria-label="Dismiss"
         >
           ×
         </button>
       </div>
+      {/* Drain bar — shows TTL countdown so the user knows when it'll vanish. */}
+      {toast.ttl > 0 && !toast.leaving && (
+        <span
+          aria-hidden
+          className={`absolute left-1 right-1 bottom-0.5 h-0.5 rounded-full origin-right ${
+            VARIANT_BAR[toast.variant] ?? VARIANT_BAR.info
+          } opacity-50`}
+          style={{
+            animation: `toast-drain ${toast.ttl}ms linear forwards`,
+          }}
+        />
+      )}
     </div>
   )
 }

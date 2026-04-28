@@ -9,17 +9,17 @@ import ShareAlert from './ShareAlert'
 import AutoDispatch from './AutoDispatch'
 
 const URGENCY_STYLES = {
-  CRITICAL: 'border-red-500 bg-red-950/40',
-  HIGH: 'border-orange-500 bg-orange-950/40',
-  MEDIUM: 'border-yellow-500 bg-yellow-950/40',
-  LOW: 'border-green-500 bg-green-950/40',
+  CRITICAL: 'border-red-500/70 bg-gradient-to-br from-red-950/60 via-red-950/30 to-gray-900/40 hover:shadow-red-500/20',
+  HIGH: 'border-orange-500/70 bg-gradient-to-br from-orange-950/60 via-orange-950/30 to-gray-900/40 hover:shadow-orange-500/20',
+  MEDIUM: 'border-yellow-500/60 bg-gradient-to-br from-yellow-950/50 via-yellow-950/25 to-gray-900/40 hover:shadow-yellow-500/15',
+  LOW: 'border-green-500/60 bg-gradient-to-br from-green-950/50 via-green-950/25 to-gray-900/40 hover:shadow-green-500/15',
 }
 
 const URGENCY_BADGE = {
-  CRITICAL: 'bg-red-600 text-white',
-  HIGH: 'bg-orange-500 text-white',
-  MEDIUM: 'bg-yellow-500 text-black',
-  LOW: 'bg-green-600 text-white',
+  CRITICAL: 'bg-gradient-to-b from-red-500 to-red-600 text-white shadow-sm shadow-red-500/40',
+  HIGH: 'bg-gradient-to-b from-orange-400 to-orange-500 text-white shadow-sm shadow-orange-500/40',
+  MEDIUM: 'bg-gradient-to-b from-yellow-400 to-yellow-500 text-black shadow-sm shadow-yellow-500/40',
+  LOW: 'bg-gradient-to-b from-green-500 to-green-600 text-white shadow-sm shadow-green-500/30',
 }
 
 const CATEGORY_ICON = {
@@ -442,37 +442,37 @@ export default function AlertCard({ alert, onUpdate }) {
 
   return (
     <div
-      className={`border rounded-xl p-3 sm:p-4 ${URGENCY_STYLES[alert.urgency]} transition-all hover:shadow-lg hover:shadow-black/40 fade-in ${
-        isSkillMatch ? 'ring-1 ring-amber-400/40' : ''
+      className={`relative border rounded-xl p-3 sm:p-4 ${URGENCY_STYLES[alert.urgency]} transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl reveal-up ${
+        isSkillMatch ? 'ring-1 ring-amber-400/50 ring-offset-1 ring-offset-gray-950' : ''
       }`}
     >
       {isSkillMatch && (
-        <div className="mb-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest bg-amber-500/20 text-amber-300 border border-amber-700 px-2 py-0.5 rounded-full">
-          ✨ Matches your skills
+        <div className="mb-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest bg-gradient-to-r from-amber-500/30 to-amber-500/10 text-amber-200 border border-amber-700/70 px-2 py-0.5 rounded-full shadow-sm shadow-amber-500/20">
+          <span className="animate-pulse">✨</span> Matches your skills
         </div>
       )}
       {alert.is_anonymous && (
-        <div className="mb-2 ml-1 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest bg-gray-800 text-gray-300 border border-gray-700 px-2 py-0.5 rounded-full">
+        <div className="mb-2 ml-1 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest bg-gray-800/80 text-gray-300 border border-gray-700 px-2 py-0.5 rounded-full">
           🕶 Anonymous tip
         </div>
       )}
       <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xl shrink-0">{CATEGORY_ICON[alert.category] ?? '⚠️'}</span>
+          <span className="text-xl shrink-0 transition-transform duration-200 hover:scale-110">{CATEGORY_ICON[alert.category] ?? '⚠️'}</span>
           <span className="font-semibold capitalize text-white truncate">
             {t(`cat_${alert.category}`) ?? alert.category}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${URGENCY_BADGE[alert.urgency]}`}>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${URGENCY_BADGE[alert.urgency]} ${alert.urgency === 'CRITICAL' ? 'glow-red' : ''}`}>
             {alert.urgency}
           </span>
           {typeof alert.your_distance_km === 'number' && (
-            <span className="text-[11px] text-gray-400 bg-gray-900/60 border border-gray-800 px-2 py-0.5 rounded-full">
+            <span className="text-[11px] text-gray-400 bg-gray-900/70 border border-gray-800 px-2 py-0.5 rounded-full backdrop-blur-sm">
               {alert.your_distance_km.toFixed(1)} km
             </span>
           )}
-          <span className="text-xs text-gray-400 whitespace-nowrap">{createdAgo}</span>
+          <span className="text-xs text-gray-400 whitespace-nowrap tabular-nums">{createdAgo}</span>
         </div>
       </div>
 
@@ -550,14 +550,14 @@ export default function AlertCard({ alert, onUpdate }) {
         ) : null}
       </div>
 
-      <div className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 mb-3">
+      <div className="bg-gray-900/60 border border-gray-800 rounded-lg px-3 py-2 mb-3 backdrop-blur-sm">
         <div className="flex items-center justify-between text-xs mb-1.5">
           <span className={`font-semibold ${band.color}`}>{band.label}</span>
-          <span className="text-gray-500">{score}/100</span>
+          <span className="text-gray-500 tabular-nums">{score}/100</span>
         </div>
-        <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div className="w-full h-1.5 bg-gray-800/80 rounded-full overflow-hidden">
           <div
-            className={`h-full ${band.bar} transition-all`}
+            className={`h-full ${band.bar} transition-[width] duration-700 ease-out`}
             style={{ width: `${score}%` }}
           />
         </div>
@@ -577,14 +577,23 @@ export default function AlertCard({ alert, onUpdate }) {
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span
-          className={`text-xs px-2 py-0.5 rounded-full ${
+          className={`text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 capitalize border ${
             alert.status === 'open'
-              ? 'bg-blue-900 text-blue-300'
+              ? 'bg-blue-900/60 text-blue-300 border-blue-800/60'
               : alert.status === 'accepted'
-              ? 'bg-purple-900 text-purple-300'
-              : 'bg-gray-800 text-gray-400'
+              ? 'bg-purple-900/60 text-purple-300 border-purple-800/60'
+              : 'bg-gray-800/80 text-gray-400 border-gray-700/60'
           }`}
         >
+          <span
+            className={`inline-block w-1.5 h-1.5 rounded-full ${
+              alert.status === 'open'
+                ? 'bg-blue-400 animate-pulse'
+                : alert.status === 'accepted'
+                ? 'bg-purple-400 animate-pulse'
+                : 'bg-gray-500'
+            }`}
+          />
           {alert.status}
         </span>
 
@@ -622,7 +631,7 @@ export default function AlertCard({ alert, onUpdate }) {
             <button
               onClick={witness}
               disabled={loading === 'witness'}
-              className="text-xs bg-amber-600/80 hover:bg-amber-600 disabled:opacity-50 text-white px-3 py-1 rounded-lg transition-colors"
+              className="text-xs bg-amber-600/80 hover:bg-amber-500 disabled:opacity-50 text-white px-3 py-1 rounded-lg shadow-sm shadow-amber-500/20 hover:shadow-amber-500/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
               title={t('card_see_too_tip')}
             >
               {loading === 'witness' ? '…' : t('card_see_too')}
@@ -632,7 +641,7 @@ export default function AlertCard({ alert, onUpdate }) {
             <button
               onClick={accept}
               disabled={loading === 'accept'}
-              className="text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-1 rounded-lg transition-colors"
+              className="text-xs bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 disabled:opacity-50 text-white px-3 py-1 rounded-lg shadow-sm shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
             >
               {t('card_accept')}
             </button>
@@ -641,7 +650,7 @@ export default function AlertCard({ alert, onUpdate }) {
             <button
               onClick={resolve}
               disabled={loading === 'resolve'}
-              className="text-xs bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-3 py-1 rounded-lg transition-colors"
+              className="text-xs bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 disabled:opacity-50 text-white px-3 py-1 rounded-lg shadow-sm shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
             >
               {t('card_resolve')}
             </button>

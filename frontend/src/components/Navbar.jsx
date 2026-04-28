@@ -4,7 +4,11 @@ import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../utils/i18n'
 
 const navLink = ({ isActive }) =>
-  `transition-colors ${isActive ? 'text-white' : 'text-gray-400 hover:text-white'}`
+  `relative py-1 transition-colors after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:rounded-full after:bg-gradient-to-r after:from-orange-400 after:to-amber-300 after:origin-left after:transition-transform after:duration-300 ${
+    isActive
+      ? 'text-white after:scale-x-100'
+      : 'text-gray-400 hover:text-white after:scale-x-0 hover:after:scale-x-100'
+  }`
 
 function LanguageMenu() {
   const { lang, setLang, languages } = useI18n()
@@ -31,7 +35,7 @@ function LanguageMenu() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-xs border border-gray-700 hover:border-gray-500 text-gray-300 px-2 py-1 rounded-md transition-colors"
+        className="flex items-center gap-1 text-xs border border-gray-700 hover:border-orange-500/60 hover:bg-orange-500/5 text-gray-300 hover:text-white px-2.5 py-1 rounded-md transition-all duration-200"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label="Change language"
@@ -39,11 +43,21 @@ function LanguageMenu() {
       >
         <span aria-hidden>🌐</span>
         <span>{current.short}</span>
+        <svg
+          aria-hidden
+          width="10"
+          height="10"
+          viewBox="0 0 12 12"
+          fill="none"
+          className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        >
+          <path d="M3 4.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
       {open && (
         <ul
           role="listbox"
-          className="absolute right-0 mt-1 w-36 bg-gray-900 border border-gray-800 rounded-lg shadow-xl z-50 overflow-hidden"
+          className="absolute right-0 mt-1.5 w-36 glass border border-gray-800 rounded-lg shadow-2xl shadow-black/50 z-50 overflow-hidden pop-in"
         >
           {languages.map((l) => (
             <li key={l.code}>
@@ -57,7 +71,7 @@ function LanguageMenu() {
                 className={`w-full text-left px-3 py-2 text-sm transition-colors ${
                   l.code === lang
                     ? 'bg-orange-500/20 text-orange-300'
-                    : 'text-gray-200 hover:bg-gray-800'
+                    : 'text-gray-200 hover:bg-gray-800/80'
                 }`}
               >
                 {l.label}
@@ -75,6 +89,14 @@ export default function Navbar() {
   const { t } = useI18n()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 6)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -85,18 +107,29 @@ export default function Navbar() {
   const closeMenu = () => setMenuOpen(false)
 
   return (
-    <nav className="sticky top-0 z-40 bg-gray-900/90 backdrop-blur border-b border-gray-800">
+    <nav
+      className={`sticky top-0 z-40 glass border-b transition-all duration-300 ${
+        scrolled
+          ? 'border-gray-800 shadow-lg shadow-black/30'
+          : 'border-gray-900'
+      }`}
+    >
       <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
         <Link
           to="/"
           onClick={closeMenu}
-          className="flex items-center gap-2 text-lg sm:text-xl font-bold text-orange-400 tracking-tight"
+          className="group flex items-center gap-2 text-lg sm:text-xl font-bold tracking-tight"
         >
-          <span aria-hidden>🛟</span>
-          <span>NeighbourAid</span>
+          <span
+            aria-hidden
+            className="inline-block transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6"
+          >
+            🛟
+          </span>
+          <span className="text-gradient-brand">NeighbourAid</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-4 text-sm">
+        <div className="hidden md:flex items-center gap-5 text-sm">
           <NavLink to="/map" className={navLink}>
             {t('nav_map')}
           </NavLink>
@@ -114,7 +147,7 @@ export default function Navbar() {
               </NavLink>
               <Link
                 to="/register"
-                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1.5 rounded-lg transition-colors"
+                className="bg-gradient-to-b from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white px-4 py-1.5 rounded-lg shadow-md shadow-orange-500/20 hover:shadow-orange-500/40 transition-all duration-200 hover:-translate-y-0.5"
               >
                 {t('nav_join')}
               </Link>
@@ -128,7 +161,7 @@ export default function Navbar() {
                   </NavLink>
                   <Link
                     to="/post-alert"
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg transition-colors"
+                    className="bg-gradient-to-b from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-white px-4 py-1.5 rounded-lg shadow-md shadow-red-500/20 hover:shadow-red-500/40 transition-all duration-200 hover:-translate-y-0.5"
                   >
                     {t('nav_report')}
                   </Link>
@@ -137,19 +170,12 @@ export default function Navbar() {
               {user.role === 'volunteer' && (
                 <Link
                   to="/volunteer"
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-lg transition-colors"
+                  className="bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white px-4 py-1.5 rounded-lg shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all duration-200 hover:-translate-y-0.5"
                 >
                   {t('nav_volunteer')}
                 </Link>
               )}
-              <NavLink
-                to="/profile"
-                className={({ isActive }) =>
-                  `transition-colors ${
-                    isActive ? 'text-white' : 'text-gray-400 hover:text-white'
-                  }`
-                }
-              >
+              <NavLink to="/profile" className={navLink}>
                 {user.name || t('nav_profile')}{' '}
                 <span className="text-gray-600">·</span>{' '}
                 <span className="capitalize text-gray-300">{user.role}</span>
@@ -170,43 +196,77 @@ export default function Navbar() {
           <LanguageMenu />
           <button
             onClick={() => setMenuOpen((v) => !v)}
-            className="text-gray-300 hover:text-white p-2 -mr-2"
+            className="text-gray-300 hover:text-white p-2 -mr-2 rounded-lg transition-colors"
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={menuOpen}
           >
-            {menuOpen ? (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            ) : (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="3" y1="7" x2="21" y2="7" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="17" x2="21" y2="17" />
-              </svg>
-            )}
+            <div className="relative w-[22px] h-[22px]">
+              <span
+                className={`absolute left-0 top-[5px] block h-0.5 w-full rounded-full bg-current transition-all duration-300 ${
+                  menuOpen ? 'translate-y-[6px] rotate-45' : ''
+                }`}
+              />
+              <span
+                className={`absolute left-0 top-[11px] block h-0.5 w-full rounded-full bg-current transition-all duration-200 ${
+                  menuOpen ? 'opacity-0 -translate-x-2' : 'opacity-100'
+                }`}
+              />
+              <span
+                className={`absolute left-0 top-[17px] block h-0.5 w-full rounded-full bg-current transition-all duration-300 ${
+                  menuOpen ? '-translate-y-[6px] -rotate-45' : ''
+                }`}
+              />
+            </div>
           </button>
         </div>
       </div>
 
-      {menuOpen && (
-        <div className="md:hidden border-t border-gray-800 px-4 py-3 space-y-1 text-sm bg-gray-900/95 backdrop-blur">
-          <NavLink onClick={closeMenu} to="/map" className={({ isActive }) => `block px-2 py-2 rounded-lg ${isActive ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800'}`}>
-            {t('nav_map')}
-          </NavLink>
-          <NavLink onClick={closeMenu} to="/safety" className={({ isActive }) => `block px-2 py-2 rounded-lg ${isActive ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800'}`}>
-            {t('nav_safety')}
-          </NavLink>
-          <NavLink onClick={closeMenu} to="/resources" className={({ isActive }) => `block px-2 py-2 rounded-lg ${isActive ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800'}`}>
-            {t('nav_resources')}
-          </NavLink>
+      <div
+        className={`md:hidden overflow-hidden border-t border-gray-800/60 transition-all duration-300 ease-out ${
+          menuOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <div className="px-4 py-3 space-y-1 text-sm glass">
+          {[
+            { to: '/map', label: t('nav_map') },
+            { to: '/safety', label: t('nav_safety') },
+            { to: '/resources', label: t('nav_resources') },
+          ].map((item) => (
+            <NavLink
+              key={item.to}
+              onClick={closeMenu}
+              to={item.to}
+              className={({ isActive }) =>
+                `block px-3 py-2 rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-orange-500/15 text-white border-l-2 border-orange-400 pl-[10px]'
+                    : 'text-gray-300 hover:bg-gray-800/80 hover:text-white'
+                }`
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
           {!user ? (
             <>
-              <NavLink onClick={closeMenu} to="/login" className={({ isActive }) => `block px-2 py-2 rounded-lg ${isActive ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800'}`}>
+              <NavLink
+                onClick={closeMenu}
+                to="/login"
+                className={({ isActive }) =>
+                  `block px-3 py-2 rounded-lg transition-colors ${
+                    isActive
+                      ? 'bg-orange-500/15 text-white border-l-2 border-orange-400 pl-[10px]'
+                      : 'text-gray-300 hover:bg-gray-800/80 hover:text-white'
+                  }`
+                }
+              >
                 {t('nav_login')}
               </NavLink>
-              <Link onClick={closeMenu} to="/register" className="block px-2 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-center font-semibold">
+              <Link
+                onClick={closeMenu}
+                to="/register"
+                className="block px-3 py-2 rounded-lg bg-gradient-to-b from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white text-center font-semibold shadow-md shadow-orange-500/20 transition-all"
+              >
                 {t('nav_join')}
               </Link>
             </>
@@ -214,34 +274,62 @@ export default function Navbar() {
             <>
               {user.role === 'reporter' && (
                 <>
-                  <NavLink onClick={closeMenu} to="/my-alerts" className={({ isActive }) => `block px-2 py-2 rounded-lg ${isActive ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800'}`}>
+                  <NavLink
+                    onClick={closeMenu}
+                    to="/my-alerts"
+                    className={({ isActive }) =>
+                      `block px-3 py-2 rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-orange-500/15 text-white border-l-2 border-orange-400 pl-[10px]'
+                          : 'text-gray-300 hover:bg-gray-800/80 hover:text-white'
+                      }`
+                    }
+                  >
                     {t('nav_my_alerts')}
                   </NavLink>
-                  <Link onClick={closeMenu} to="/post-alert" className="block px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-center font-semibold">
+                  <Link
+                    onClick={closeMenu}
+                    to="/post-alert"
+                    className="block px-3 py-2 rounded-lg bg-gradient-to-b from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-white text-center font-semibold shadow-md shadow-red-500/20 transition-all"
+                  >
                     {t('nav_report')}
                   </Link>
                 </>
               )}
               {user.role === 'volunteer' && (
-                <Link onClick={closeMenu} to="/volunteer" className="block px-2 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-center font-semibold">
+                <Link
+                  onClick={closeMenu}
+                  to="/volunteer"
+                  className="block px-3 py-2 rounded-lg bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white text-center font-semibold shadow-md shadow-emerald-500/20 transition-all"
+                >
                   {t('nav_volunteer')}
                 </Link>
               )}
-              <NavLink onClick={closeMenu} to="/profile" className={({ isActive }) => `block px-2 py-2 rounded-lg ${isActive ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800'}`}>
+              <NavLink
+                onClick={closeMenu}
+                to="/profile"
+                className={({ isActive }) =>
+                  `block px-3 py-2 rounded-lg transition-colors ${
+                    isActive
+                      ? 'bg-orange-500/15 text-white border-l-2 border-orange-400 pl-[10px]'
+                      : 'text-gray-300 hover:bg-gray-800/80 hover:text-white'
+                  }`
+                }
+              >
                 {user.name || t('nav_profile')}{' '}
                 <span className="text-gray-600">·</span>{' '}
                 <span className="capitalize text-gray-400">{user.role}</span>
               </NavLink>
               <button
                 onClick={handleLogout}
-                className="w-full text-left px-2 py-2 rounded-lg text-red-400 hover:bg-gray-800"
+                className="w-full text-left px-3 py-2 rounded-lg text-red-400 hover:bg-red-950/40 transition-colors"
               >
                 {t('nav_logout')}
               </button>
             </>
           )}
         </div>
-      )}
+      </div>
     </nav>
   )
 }
