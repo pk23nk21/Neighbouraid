@@ -425,6 +425,39 @@ the repo, generates `JWT_SECRET`, runs `docker compose up -d`.
 
 ---
 
+## Mobile app commands
+
+The mobile build path now uses **Capacitor on top of the existing
+Vite app**, so the web and mobile shells share the same React codebase.
+
+From `frontend/`:
+
+```bash
+npm run mobile:doctor
+npm run mobile:add:android
+npm run mobile:android
+```
+
+Useful commands:
+
+- `npm run mobile:doctor` validates the local Capacitor setup
+- `npm run mobile:add:android` creates the native Android project
+  (run once)
+- `npm run mobile:android` builds the web app, syncs assets/plugins,
+  and opens Android Studio
+- `npm run mobile:sync` rebuilds and resyncs after frontend changes
+- `npm run mobile:copy` rebuilds and copies only the web bundle
+- `npm run mobile:add:ios` / `npm run mobile:ios` provide the same flow
+  for iOS (**macOS only**)
+
+Requirements:
+
+- Android: Android Studio + Android SDK
+- iOS: Xcode on macOS
+- PWA install still works for users who do not need the native wrapper
+
+---
+
 ## Environment variables
 
 | Variable | Where | Default | Notes |
@@ -453,7 +486,8 @@ Copy `.env.example` → `.env` for local dev.
 - [ ] **More languages** — Tamil, Bengali, Telugu, Marathi
 - [ ] **Volunteer reputation** beyond resolved/accepted ratio (NPS-style
   reporter rating?)
-- [ ] **React Native app** — Android-first, low-connectivity optimised
+- [ ] **Deeper native mobile features** — offline-first Android polish,
+  richer notifications, and low-connectivity optimisations
 - [ ] **Kubernetes manifests** — horizontal scale across regions
 - [ ] **Fine-tuned HF model** on Indian crisis text corpus
 - [ ] **End-to-end browser tests** (Playwright) for the SW + map +

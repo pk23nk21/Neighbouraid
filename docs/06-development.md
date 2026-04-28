@@ -113,6 +113,29 @@ npm run dev
 Opens `http://localhost:3000`. Vite proxies `/api/*` to `:8000` and
 `/ws/*` similarly, so the frontend doesn't need `VITE_API_URL`.
 
+### Optional Android/iOS packaging via Capacitor
+
+If you want a native shell around the same React app:
+
+```bash
+cd frontend
+npm run mobile:doctor
+npm run mobile:add:android
+npm run mobile:android
+```
+
+Useful commands:
+
+- `npm run mobile:sync` â€” rebuild the web app and sync native assets
+- `npm run mobile:copy` â€” rebuild and copy only the web bundle
+- `npm run mobile:open:android` â€” reopen the generated Android project
+- `npm run mobile:add:ios` / `npm run mobile:ios` â€” iOS setup + open
+  flow (**macOS only**)
+
+`mobile:add:*` is a one-time command per platform. After that, the
+usual loop is `npm run mobile:sync` and then build/run from Android
+Studio or Xcode.
+
 ### One-shot via Docker Compose
 
 If you'd rather run one command:

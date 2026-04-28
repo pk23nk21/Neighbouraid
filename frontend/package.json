@@ -5,12 +5,25 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "mobile:build": "npm run build && npx cap sync",
+    "mobile:copy": "npm run build && npx cap copy",
+    "mobile:sync": "npm run build && npx cap sync",
+    "mobile:doctor": "npx cap doctor",
+    "mobile:add:android": "npx cap add android",
+    "mobile:open:android": "npx cap open android",
+    "mobile:android": "npm run mobile:sync && npx cap open android",
+    "mobile:add:ios": "npx cap add ios",
+    "mobile:open:ios": "npx cap open ios",
+    "mobile:ios": "npm run mobile:sync && npx cap open ios",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/ios": "^8.3.1",
     "axios": "^1.6.2",
     "jwt-decode": "^4.0.0",
     "leaflet": "^1.9.4",
@@ -20,6 +33,7 @@
     "react-router-dom": "^6.20.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.1",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.3.1",
     "@testing-library/user-event": "^14.5.2",
@@ -34,6 +48,7 @@
     "jsdom": "^24.0.0",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
+    "typescript": "^6.0.3",
     "vite": "^6.4.2",
     "vitest": "^2.1.9"
   }
