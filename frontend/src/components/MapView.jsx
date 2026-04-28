@@ -223,6 +223,10 @@ function useOsrmRoute(from, to) {
   const [route, setRoute] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const fromLat = from?.[0]
+  const fromLng = from?.[1]
+  const toLat = to?.[0]
+  const toLng = to?.[1]
 
   useEffect(() => {
     if (!from || !to) {
@@ -234,7 +238,7 @@ function useOsrmRoute(from, to) {
     const controller = new AbortController()
     setLoading(true)
     setError('')
-    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`
+    const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`
     fetch(url, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error('Routing service unavailable')
@@ -266,7 +270,7 @@ function useOsrmRoute(from, to) {
       cancelled = true
       controller.abort()
     }
-  }, [from?.[0], from?.[1], to?.[0], to?.[1]])
+  }, [from, fromLat, fromLng, to, toLat, toLng])
 
   return { route, loading, error }
 }
