@@ -205,39 +205,52 @@ export default function VolunteerFeed() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
-      <div className="flex items-center justify-between mb-5 sm:mb-6 gap-3">
+      <div className="flex items-center justify-between mb-5 sm:mb-6 gap-3 reveal-up">
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold text-white">{t('vol_title')}</h1>
           <p className="text-gray-400 text-xs sm:text-sm mt-1">{t('vol_subtitle')}</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0" aria-live="polite">
-          <span
-            className={`w-2.5 h-2.5 rounded-full ${
-              connected ? 'bg-green-500 animate-pulse' : 'bg-gray-600'
-            }`}
-          />
-          <span className="text-xs text-gray-400 capitalize">
+        <div
+          className={`flex items-center gap-2 shrink-0 px-2.5 py-1 rounded-full border transition-colors ${
+            connected
+              ? 'border-emerald-700/60 bg-emerald-950/40'
+              : 'border-gray-700 bg-gray-900/60'
+          }`}
+          aria-live="polite"
+        >
+          <span className="relative flex h-2 w-2" aria-hidden>
+            {connected && (
+              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+            )}
+            <span
+              className={`relative inline-flex rounded-full h-2 w-2 ${
+                connected ? 'bg-emerald-400' : 'bg-gray-500'
+              }`}
+            />
+          </span>
+          <span className={`text-xs capitalize ${connected ? 'text-emerald-300' : 'text-gray-400'}`}>
             {connected ? t('vol_live') : status}
           </span>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-950 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3 mb-6">
-          {error}
+        <div className="bg-red-950/70 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 flex items-start gap-2 pop-in">
+          <span aria-hidden className="text-base shrink-0 mt-px">⚠️</span>
+          <span>{error}</span>
         </div>
       )}
 
       {notif.permission === 'default' && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="bg-gradient-to-br from-gray-900 to-gray-900/60 border border-gray-800 rounded-xl px-4 py-3 mb-6 flex flex-col sm:flex-row sm:items-center gap-3 reveal-up stagger-1 shadow-md shadow-black/20">
           <div className="text-sm text-gray-300 flex-1">
             {t('vol_enable_notif')}
           </div>
           <button
             onClick={notif.request}
-            className="text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-lg whitespace-nowrap self-start sm:self-auto"
+            className="text-xs bg-gradient-to-b from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white px-3 py-1.5 rounded-lg shadow-sm shadow-orange-500/20 hover:shadow-orange-500/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 whitespace-nowrap self-start sm:self-auto"
           >
-            {t('vol_enable')}
+            🔔 {t('vol_enable')}
           </button>
         </div>
       )}
@@ -249,10 +262,10 @@ export default function VolunteerFeed() {
         <button
           type="button"
           onClick={() => voiceAlert.setEnabled((v) => !v)}
-          className={`text-[11px] mb-4 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border transition-colors ${
+          className={`text-[11px] mb-4 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${
             voiceAlert.enabled
-              ? 'border-blue-700 bg-blue-950/40 text-blue-300'
-              : 'border-gray-700 text-gray-500 hover:text-gray-300'
+              ? 'border-blue-700 bg-blue-950/40 text-blue-300 shadow-sm shadow-blue-500/15'
+              : 'border-gray-700 text-gray-500 hover:text-gray-300 hover:border-blue-500/40'
           }`}
           title="Read out CRITICAL alerts via your device's voice"
         >
@@ -265,9 +278,9 @@ export default function VolunteerFeed() {
         <SkeletonAlertList count={3} />
       ) : (
         <>
-          <section className="mb-8">
+          <section className="mb-8 reveal-up stagger-2">
             <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-3">
-              {t('vol_open')} — {openAlerts.length}
+              {t('vol_open')} — <span className="tabular-nums">{openAlerts.length}</span>
             </h2>
             {openAlerts.length === 0 ? (
               <EmptyState
@@ -285,9 +298,9 @@ export default function VolunteerFeed() {
           </section>
 
           {acceptedAlerts.length > 0 && (
-            <section>
+            <section className="reveal-up stagger-3">
               <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-3">
-                {t('vol_active')} — {acceptedAlerts.length}
+                {t('vol_active')} — <span className="tabular-nums">{acceptedAlerts.length}</span>
               </h2>
               <div className="space-y-3">
                 {acceptedAlerts.map((a) => (

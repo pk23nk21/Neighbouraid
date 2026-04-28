@@ -6,8 +6,8 @@ import { useI18n } from '../utils/i18n'
 import BuddyPing from '../components/BuddyPing'
 
 const STATUS_STYLE = {
-  safe: 'bg-green-900/50 text-green-300 border-green-700',
-  need_help: 'bg-red-900/50 text-red-300 border-red-700',
+  safe: 'bg-gradient-to-br from-green-900/60 to-green-950/40 text-green-300 border-green-700/70',
+  need_help: 'bg-gradient-to-br from-red-900/60 to-red-950/40 text-red-300 border-red-700/70',
 }
 
 function useTimeAgo(iso) {
@@ -26,15 +26,18 @@ function useTimeAgo(iso) {
   return `${Math.floor(diff / 86400)}${t('t_day')}`
 }
 
-function CheckinRow({ c }) {
+function CheckinRow({ c, index = 0 }) {
   const ago = useTimeAgo(c.created_at)
   return (
-    <li className={`border rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 ${STATUS_STYLE[c.status]}`}>
+    <li
+      className={`border rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/30 reveal-up ${STATUS_STYLE[c.status]}`}
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
       <div className="flex items-center justify-between text-sm gap-2">
         <span className="font-semibold truncate">
           {c.status === 'safe' ? '✅' : '🆘'} {c.user_name}
         </span>
-        <span className="text-xs text-gray-400 shrink-0">{ago}</span>
+        <span className="text-xs text-gray-400 shrink-0 tabular-nums">{ago}</span>
       </div>
       {c.note && <p className="text-sm mt-1 break-words">{c.note}</p>}
     </li>
@@ -115,7 +118,7 @@ export default function Safety() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
-      <div className="mb-5 sm:mb-6">
+      <div className="mb-5 sm:mb-6 reveal-up">
         <h1 className="text-xl sm:text-2xl font-bold text-white">{t('safety_title')}</h1>
         <p className="text-gray-400 text-sm mt-1">
           {t('safety_subtitle')}
@@ -123,13 +126,14 @@ export default function Safety() {
       </div>
 
       {error && (
-        <div className="bg-red-950 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3 mb-6">
-          {error}
+        <div className="bg-red-950/70 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 flex items-start gap-2 pop-in">
+          <span aria-hidden className="text-base shrink-0 mt-px">⚠️</span>
+          <span>{error}</span>
         </div>
       )}
 
       {user ? (
-        <section className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-5 mb-6">
+        <section className="bg-gradient-to-br from-gray-900 to-gray-900/60 border border-gray-800 rounded-xl p-4 sm:p-5 mb-6 reveal-up stagger-1 shadow-lg shadow-black/20">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-3">
             {t('safety_your')}
           </h2>
@@ -145,29 +149,37 @@ export default function Safety() {
               onChange={(e) => setNote(e.target.value)}
               placeholder={t('safety_note_ph')}
               maxLength={280}
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-orange-500"
+              className="w-full bg-gray-800/80 border border-gray-700 text-white rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:bg-gray-800 transition-all duration-200 placeholder:text-gray-600"
             />
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={() => checkin('safe')}
                 disabled={!coords || !!saving}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors"
+                className="group relative flex-1 bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] overflow-hidden"
               >
-                {saving === 'safe' ? t('safety_saving') : t('safety_i_am_safe')}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent skew-x-12 -translate-x-full group-hover:translate-x-[400%] transition-transform duration-700 ease-out"
+                />
+                <span className="relative">{saving === 'safe' ? t('safety_saving') : `✅ ${t('safety_i_am_safe')}`}</span>
               </button>
               <button
                 onClick={() => checkin('need_help')}
                 disabled={!coords || !!saving}
-                className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors"
+                className="group relative flex-1 bg-gradient-to-b from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg shadow-md shadow-red-500/20 hover:shadow-red-500/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] overflow-hidden"
               >
-                {saving === 'need_help' ? t('safety_saving') : t('safety_i_need_help')}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent skew-x-12 -translate-x-full group-hover:translate-x-[400%] transition-transform duration-700 ease-out"
+                />
+                <span className="relative">{saving === 'need_help' ? t('safety_saving') : `🆘 ${t('safety_i_need_help')}`}</span>
               </button>
             </div>
           </div>
         </section>
       ) : (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-5 mb-6 text-sm text-gray-400">
-          <a href="/login" className="text-orange-400 hover:text-orange-300">
+          <a href="/login" className="text-orange-400 hover:text-orange-300 underline-offset-2 hover:underline">
             {t('safety_sign_in')}
           </a>{' '}
           {t('safety_sign_in_to')}
@@ -176,14 +188,15 @@ export default function Safety() {
 
       <section>
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-3">
-          {t('safety_nearby')} · {list.length} {t('safety_checkins')} ({safeCount} {t('safety_safe')}, {helpCount} {t('safety_need_help')})
+          {t('safety_nearby')} · <span className="tabular-nums">{list.length}</span> {t('safety_checkins')} (
+          <span className="text-emerald-400 tabular-nums">{safeCount}</span> {t('safety_safe')}, <span className="text-red-400 tabular-nums">{helpCount}</span> {t('safety_need_help')})
         </h2>
         {list.length === 0 ? (
           <p className="text-gray-500 text-sm">{t('safety_none_yet')}</p>
         ) : (
           <ul className="space-y-2">
             {list.map((c, i) => (
-              <CheckinRow key={`${c.user_name}-${i}`} c={c} />
+              <CheckinRow key={`${c.user_name}-${i}`} c={c} index={i} />
             ))}
           </ul>
         )}

@@ -164,10 +164,18 @@ export default function PostAlert() {
   const [lng, lat] = form.location.coordinates
 
   return (
-    <div className="min-h-screen flex items-start sm:items-center justify-center px-4 py-8 sm:py-12">
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 sm:p-8 w-full max-w-lg">
+    <div className="relative min-h-screen flex items-start sm:items-center justify-center px-4 py-8 sm:py-12 overflow-hidden">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-72 w-[36rem] rounded-full bg-red-500/10 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-24 right-1/4 h-56 w-72 rounded-full bg-orange-500/10 blur-3xl"
+      />
+      <div className="relative bg-gradient-to-b from-gray-900/95 to-gray-900/80 backdrop-blur border border-gray-800 rounded-2xl p-5 sm:p-8 w-full max-w-lg shadow-2xl shadow-black/50 reveal-up">
         <div className="flex items-center gap-3 mb-2">
-          <span className="text-3xl">🚨</span>
+          <span className="text-3xl glow-red rounded-full p-1">🚨</span>
           <h1 className="text-xl sm:text-2xl font-bold text-white">{t('post_title')}</h1>
         </div>
         <p className="text-gray-400 text-sm mb-4 sm:mb-6">
@@ -175,20 +183,21 @@ export default function PostAlert() {
         </p>
 
         {!online && (
-          <div className="bg-amber-950 border border-amber-700 text-amber-300 text-xs rounded-lg px-3 py-2 mb-4 flex items-center gap-2">
-            <span>📡</span>
+          <div className="bg-amber-950/70 border border-amber-700 text-amber-300 text-xs rounded-lg px-3 py-2 mb-4 flex items-center gap-2 pop-in">
+            <span aria-hidden>📡</span>
             <span>Offline — your alert will be queued and sent automatically.</span>
           </div>
         )}
         {pendingCount > 0 && (
-          <div className="bg-blue-950 border border-blue-700 text-blue-300 text-xs rounded-lg px-3 py-2 mb-4">
+          <div className="bg-blue-950/70 border border-blue-700 text-blue-300 text-xs rounded-lg px-3 py-2 mb-4 tabular-nums">
             {pendingCount} queued alert{pendingCount !== 1 ? 's' : ''} awaiting connectivity.
           </div>
         )}
 
         {error && (
-          <div className="bg-red-950 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3 mb-6">
-            {error}
+          <div className="bg-red-950/70 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3 mb-6 flex items-start gap-2 pop-in">
+            <span aria-hidden className="text-base shrink-0 mt-px">⚠️</span>
+            <span>{error}</span>
           </div>
         )}
 
@@ -201,10 +210,10 @@ export default function PostAlert() {
                   key={cat}
                   type="button"
                   onClick={() => setForm({ ...form, category: cat })}
-                  className={`py-2.5 rounded-lg border capitalize text-sm font-medium transition-colors ${
+                  className={`py-2.5 rounded-lg border capitalize text-sm font-medium transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 ${
                     form.category === cat
-                      ? 'border-orange-500 bg-orange-500/20 text-orange-400'
-                      : 'border-gray-700 text-gray-400 hover:border-gray-500'
+                      ? 'border-orange-500 bg-gradient-to-b from-orange-500/25 to-orange-500/10 text-orange-300 shadow-sm shadow-orange-500/15'
+                      : 'border-gray-700 text-gray-400 hover:border-orange-500/40 hover:text-gray-200 hover:bg-gray-800/40'
                   }`}
                 >
                   {t(`cat_${cat}`)}
@@ -239,7 +248,7 @@ export default function PostAlert() {
               rows={4}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-orange-500 transition-colors resize-none text-base"
+              className="w-full bg-gray-800/80 border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:bg-gray-800 transition-all duration-200 resize-none text-base placeholder:text-gray-600"
               placeholder={t('post_description_placeholder')}
             />
             {voice.error && (
@@ -302,30 +311,49 @@ export default function PostAlert() {
               <input
                 readOnly
                 value={`${lat.toFixed(5)}, ${lng.toFixed(5)}`}
-                className={`flex-1 min-w-0 bg-gray-800 border text-gray-300 rounded-lg px-3 sm:px-4 py-2.5 text-sm ${
-                  locationSet ? 'border-emerald-700' : 'border-gray-700'
+                className={`flex-1 min-w-0 bg-gray-800/80 border text-gray-300 rounded-lg px-3 sm:px-4 py-2.5 text-sm transition-colors tabular-nums ${
+                  locationSet ? 'border-emerald-700/70 ring-1 ring-emerald-700/30' : 'border-gray-700'
                 }`}
               />
               <button
                 type="button"
                 onClick={detectLocation}
                 disabled={locLoading}
-                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2.5 rounded-lg text-sm transition-colors disabled:opacity-50 whitespace-nowrap"
+                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2.5 rounded-lg text-sm transition-all duration-200 disabled:opacity-50 whitespace-nowrap hover:-translate-y-0.5 active:translate-y-0 active:scale-95 shadow-sm shadow-black/40"
               >
-                {locLoading ? '…' : t('post_use_gps')}
+                {locLoading ? (
+                  <svg className="animate-spin h-4 w-4 inline" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                    <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <>📍 {t('post_use_gps')}</>
+                )}
               </button>
             </div>
             {locationSet && (
-              <p className="text-[11px] text-emerald-400 mt-1">✓ GPS location captured</p>
+              <p className="text-[11px] text-emerald-400 mt-1 pop-in">✓ GPS location captured</p>
             )}
           </div>
 
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors"
+            className="group relative w-full bg-gradient-to-b from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl shadow-lg shadow-red-500/20 hover:shadow-red-500/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] overflow-hidden"
           >
-            {submitting ? t('post_submitting') : t('post_submit')}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent skew-x-12 -translate-x-full group-hover:translate-x-[400%] transition-transform duration-700 ease-out"
+            />
+            <span className="relative inline-flex items-center justify-center gap-2">
+              {submitting && (
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                  <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              )}
+              {submitting ? t('post_submitting') : t('post_submit')}
+            </span>
           </button>
         </form>
       </div>

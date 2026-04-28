@@ -141,9 +141,14 @@ export default function Profile() {
 
   const [lng, lat] = me?.location?.coordinates ?? [0, 0]
 
+  const sectionCls =
+    'bg-gradient-to-br from-gray-900 to-gray-900/60 border border-gray-800 rounded-xl p-4 sm:p-5 shadow-lg shadow-black/20'
+  const saveBtnCls =
+    'group relative bg-gradient-to-b from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-md shadow-orange-500/20 hover:shadow-orange-500/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] overflow-hidden'
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 sm:py-10 space-y-5 sm:space-y-6">
-      <div>
+      <div className="reveal-up">
         <h1 className="text-xl sm:text-2xl font-bold text-white">{t('profile_title')}</h1>
         <p className="text-gray-500 text-sm break-words">
           {t('profile_signed_as')} <span className="text-gray-300">{me?.email}</span>
@@ -151,17 +156,19 @@ export default function Profile() {
       </div>
 
       {error && (
-        <div className="bg-red-950 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3">
-          {error}
+        <div className="bg-red-950/70 border border-red-700 text-red-300 text-sm rounded-lg px-4 py-3 flex items-start gap-2 pop-in">
+          <span aria-hidden className="text-base shrink-0 mt-px">⚠️</span>
+          <span>{error}</span>
         </div>
       )}
       {message && (
-        <div className="bg-green-950 border border-green-700 text-green-300 text-sm rounded-lg px-4 py-3">
-          {message}
+        <div className="bg-emerald-950/70 border border-emerald-700 text-emerald-300 text-sm rounded-lg px-4 py-3 flex items-start gap-2 pop-in">
+          <span aria-hidden className="text-base shrink-0 mt-px">✅</span>
+          <span>{message}</span>
         </div>
       )}
 
-      <section className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-5">
+      <section className={`${sectionCls} reveal-up stagger-1`}>
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-3">
           {t('profile_identity')}
         </h2>
@@ -177,7 +184,7 @@ export default function Profile() {
         </dl>
       </section>
 
-      <section className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-5">
+      <section className={`${sectionCls} reveal-up stagger-2`}>
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest">
             {t('profile_home_location')}
@@ -185,16 +192,16 @@ export default function Profile() {
           <button
             onClick={detectAndUpdate}
             disabled={locLoading || saving}
-            className="text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
+            className="text-xs bg-gradient-to-b from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white px-3 py-1.5 rounded-lg disabled:opacity-50 shadow-sm shadow-orange-500/20 hover:shadow-orange-500/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
           >
             {locLoading ? t('profile_detecting') : saving ? t('profile_saving') : t('profile_update_loc')}
           </button>
         </div>
-        <p className="text-gray-400 text-sm font-mono">
+        <p className="text-gray-400 text-sm font-mono tabular-nums">
           {lat.toFixed(5)}, {lng.toFixed(5)}
         </p>
         {(accuracy || locTimestamp) && (
-          <p className="text-[11px] text-gray-600 mt-1">
+          <p className="text-[11px] text-gray-600 mt-1 tabular-nums">
             {accuracy ? `±${Math.round(accuracy)} m` : ''}
             {accuracy && locTimestamp ? ' · ' : ''}
             {locTimestamp ? new Date(locTimestamp).toLocaleString() : ''}
@@ -206,7 +213,7 @@ export default function Profile() {
       </section>
 
       {me?.role === 'volunteer' && (
-        <section className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-5">
+        <section className={`${sectionCls} reveal-up stagger-3`}>
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-3">
             Skills &amp; availability
           </h2>
@@ -216,9 +223,13 @@ export default function Profile() {
             <button
               onClick={saveSkills}
               disabled={saving}
-              className="bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg"
+              className={saveBtnCls}
             >
-              {saving ? 'Saving…' : 'Save skills'}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent skew-x-12 -translate-x-full group-hover:translate-x-[400%] transition-transform duration-700 ease-out"
+              />
+              <span className="relative">{saving ? 'Saving…' : 'Save skills'}</span>
             </button>
           </div>
           {skillsDraft.length > 0 && (
@@ -232,7 +243,7 @@ export default function Profile() {
         </section>
       )}
 
-      <section className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-5">
+      <section className={`${sectionCls} reveal-up stagger-4`}>
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-1">
           Emergency contacts
         </h2>
@@ -243,13 +254,17 @@ export default function Profile() {
         <button
           onClick={saveContacts}
           disabled={saving}
-          className="mt-3 bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2 rounded-lg"
+          className={`mt-3 ${saveBtnCls}`}
         >
-          {saving ? 'Saving…' : 'Save contacts'}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent skew-x-12 -translate-x-full group-hover:translate-x-[400%] transition-transform duration-700 ease-out"
+          />
+          <span className="relative">{saving ? 'Saving…' : 'Save contacts'}</span>
         </button>
       </section>
 
-      <section className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-5">
+      <section className={`${sectionCls} reveal-up stagger-5`}>
         <div className="flex items-center justify-between mb-3 gap-2">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest">
             {t('profile_activity')}
@@ -262,13 +277,13 @@ export default function Profile() {
           <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center">
             <Stat label={t('profile_stat_posted')} value={stats.posted} />
             <Stat label={t('profile_stat_open')} value={stats.open} />
-            <Stat label={t('profile_stat_resolved')} value={stats.resolved} />
+            <Stat label={t('profile_stat_resolved')} value={stats.resolved} accent="text-emerald-400" />
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center">
             <Stat label={t('profile_stat_accepted')} value={stats?.accepted ?? 0} />
-            <Stat label={t('profile_stat_inprogress')} value={stats?.in_progress ?? 0} />
-            <Stat label={t('profile_stat_resolved')} value={stats?.resolved ?? 0} />
+            <Stat label={t('profile_stat_inprogress')} value={stats?.in_progress ?? 0} accent="text-blue-400" />
+            <Stat label={t('profile_stat_resolved')} value={stats?.resolved ?? 0} accent="text-emerald-400" />
           </div>
         )}
       </section>
@@ -276,10 +291,10 @@ export default function Profile() {
   )
 }
 
-function Stat({ label, value }) {
+function Stat({ label, value, accent = 'text-orange-400' }) {
   return (
-    <div className="bg-gray-950 border border-gray-800 rounded-lg py-3 px-2">
-      <div className="text-xl sm:text-2xl font-bold text-orange-400">{value}</div>
+    <div className="bg-gray-950/80 border border-gray-800 rounded-lg py-3 px-2 transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-700 hover:shadow-md hover:shadow-black/40">
+      <div className={`text-xl sm:text-2xl font-bold tabular-nums ${accent}`}>{value}</div>
       <div className="text-[10px] sm:text-[11px] text-gray-500 uppercase tracking-widest mt-0.5">
         {label}
       </div>
